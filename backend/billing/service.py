@@ -8,6 +8,9 @@ from datetime import UTC, datetime, timedelta
 from billing.events import SubscriptionEvent
 
 PREMIUM_STATUSES = {"active", "trialing"}
+# Paddle ends a scheduled cancellation with a closing `canceled` webhook at period end;
+# if it is dropped, premium still ends this long after the period does.
+CANCEL_GRACE = timedelta(days=1)
 
 
 def tier_for(status: str, since: datetime, now: datetime, grace_days: int) -> str:
@@ -28,11 +31,16 @@ def recompute_tier(
 ) -> str:
     """Premium if ANY of the user's subscriptions currently grants it. Caller commits."""
     rows = conn.execute(
-        "SELECT status, last_event_at FROM subscriptions WHERE user_id = ?", (user_id,)
+        "SELECT status, last_event_at, cancel_at_period_end, current_period_end "
+        "FROM subscriptions WHERE user_id = ?",
+        (user_id,),
     ).fetchall()
     tier = "free"
     for row in rows:
         since = datetime.fromisoformat(row["last_event_at"])
+        if row["cancel_at_period_end"] and row["current_period_end"]:
+            if now - datetime.fromisoformat(row["current_period_end"]) > CANCEL_GRACE:
+                continue
         if tier_for(row["status"], since, now, grace_days) == "premium":
             tier = "premium"
             break

@@ -559,3 +559,130 @@ def test_downgrade_keeps_data_and_locks_premium_features(conn):
     resub = payload(event_id="evt_3", sub="sub_2", occurred="2026-11-03T10:00:00Z")
     apply_event(conn, parse_paddle_event(resub), now=NOW)
     assert user(conn)["tier"] == "premium"
+
+
+# --- Task 5.3: full Paddle lifecycle state machine ---------------------------------
+def _tier_after(conn, *steps, now=NOW):
+    """Apply (type, status, occurred, extra) steps in order; return the final tier."""
+    for i, (etype, status, occurred, extra) in enumerate(steps):
+        ev = payload(event_id=f"evt_s{i}", etype=etype, status=status, occurred=occurred, **extra)
+        apply_event(conn, parse_paddle_event(ev), now=now)
+    return user(conn)["tier"]
+
+
+D1, D2, D3 = "2026-11-01T10:00:00Z", "2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"
+
+
+@pytest.mark.parametrize(
+    "steps,expected",
+    [
+        pytest.param([("subscription.created", "trialing", D1, {})], "premium", id="trialing"),
+        pytest.param(
+            [
+                ("subscription.created", "trialing", D1, {}),
+                ("subscription.activated", "active", D2, {}),
+            ],
+            "premium",
+            id="trial-to-active",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.past_due", "past_due", D2, {}),
+            ],
+            "premium",
+            id="past-due-inside-grace",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.past_due", "past_due", D2, {}),
+                ("subscription.activated", "active", D3, {}),
+            ],
+            "premium",
+            id="past-due-recovered",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.updated", "active", D2, {"cancel": True}),
+            ],
+            "premium",
+            id="scheduled-cancel-keeps-premium-until-period-end",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.updated", "active", D2, {"cancel": True}),
+                ("subscription.canceled", "canceled", D3, {}),
+            ],
+            "free",
+            id="scheduled-cancel-then-period-end",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.paused", "paused", D2, {}),
+            ],
+            "free",
+            id="paused",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.paused", "paused", D2, {}),
+                ("subscription.resumed", "active", D3, {}),
+            ],
+            "premium",
+            id="resumed",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.canceled", "canceled", D2, {}),
+                ("subscription.activated", "active", D3, {"sub": "sub_2"}),
+            ],
+            "premium",
+            id="resubscribe-new-subscription",
+        ),
+        pytest.param(
+            [
+                ("subscription.activated", "active", D1, {}),
+                ("subscription.updated", "active", D2, {}),
+            ],
+            "premium",
+            id="plan-change-expert-to-base-stays-premium",
+        ),
+    ],
+)
+def test_lifecycle_tier(conn, steps, expected):
+    assert _tier_after(conn, *steps) == expected
+
+
+def test_refund_reaches_free_via_canceled_event(conn):
+    """Paddle refunds cancel the subscription; the state machine must land on free."""
+    tier = _tier_after(
+        conn,
+        ("subscription.activated", "active", D1, {}),
+        ("subscription.canceled", "canceled", D2, {}),
+    )
+    assert tier == "free"
+    row = conn.execute("SELECT status FROM subscriptions").fetchone()
+    assert row["status"] == "canceled"
+
+
+def test_past_due_event_arriving_beyond_grace_is_free(conn):
+    ev = payload(status="past_due", etype="subscription.past_due", occurred=D1)
+    apply_event(conn, parse_paddle_event(ev), now=NOW + timedelta(days=30), grace_days=7)
+    assert user(conn)["tier"] == "free"
+
+
+def test_scheduled_cancel_with_dropped_final_webhook_is_swept(conn):
+    """Paddle's closing `canceled` webhook never arrived: the sweep must still end premium."""
+    ev = payload(status="active", etype="subscription.updated", cancel=True, ends=D2)
+    apply_event(conn, parse_paddle_event(ev), now=NOW)
+    assert user(conn)["tier"] == "premium"
+    assert sweep_expired(conn, now=datetime(2026, 11, 2, 10, 5, tzinfo=UTC), grace_days=7) == 0
+    assert user(conn)["tier"] == "premium"  # one grace day before we drop it
+    assert sweep_expired(conn, now=datetime(2026, 11, 4, 12, 0, tzinfo=UTC), grace_days=7) == 1
+    assert user(conn)["tier"] == "free"

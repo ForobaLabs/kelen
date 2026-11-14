@@ -6,7 +6,7 @@ import logging
 import sqlite3
 from datetime import UTC, datetime, timedelta
 
-from billing.service import recompute_tier
+from billing.service import CANCEL_GRACE, recompute_tier
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def sweep_expired(
     conn: sqlite3.Connection, *, now: datetime | None = None, grace_days: int = 7
 ) -> int:
-    """Downgrade users whose only premium source is a past_due subscription beyond grace.
+    """Downgrade users whose only premium source is past_due beyond grace or a lapsed cancel.
 
     Returns the number of users downgraded. Admins are never touched.
     """
@@ -22,9 +22,10 @@ def sweep_expired(
     cutoff = (now - timedelta(days=grace_days)).isoformat()
     candidates = conn.execute(
         "SELECT DISTINCT s.user_id FROM subscriptions s JOIN users u ON u.id = s.user_id "
-        "WHERE s.status = 'past_due' AND s.last_event_at < ? "
+        "WHERE ((s.status = 'past_due' AND s.last_event_at < ?) "
+        "OR (s.cancel_at_period_end = 1 AND s.current_period_end < ?)) "
         "AND u.tier = 'premium' AND u.is_admin = 0",
-        (cutoff,),
+        (cutoff, (now - CANCEL_GRACE).isoformat()),
     ).fetchall()
     changed = 0
     for row in candidates:
