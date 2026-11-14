@@ -42,7 +42,30 @@ def _fetch_rates(rate_date: date | None) -> dict[str, float]:
         follow_redirects=True,
     )
     resp.raise_for_status()
-    return resp.json()["rates"]
+    return _clean_rates(resp.json())
+
+
+def _clean_rates(payload: object) -> dict[str, float]:
+    """Keep only positive numeric rates; raise ValueError when nothing usable remains."""
+    raw = payload.get("rates") if isinstance(payload, dict) else None
+    if not isinstance(raw, dict):
+        raise ValueError("FX provider returned no rates")
+    rates = {
+        ccy: float(v)
+        for ccy, v in raw.items()
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+    }
+    if not rates:
+        raise ValueError("FX provider returned no usable rates")
+    return rates
+
+
+def _latest_cached(conn: sqlite3.Connection, currency: str) -> float | None:
+    row = conn.execute(
+        "SELECT rate_to_eur FROM fx_rates WHERE currency = ? ORDER BY rate_date DESC LIMIT 1",
+        (currency,),
+    ).fetchone()
+    return row[0] if row else None
 
 
 def _upsert_rate(
@@ -103,15 +126,15 @@ def get_rate(conn: sqlite3.Connection, currency: str, rate_date: date | None = N
         rates = _fetch_rates(rate_date)
     except Exception as exc:
         logger.warning("FX rate fetch failed for %s on %s: %s", currency, lookup_date, exc)
-        fallback = conn.execute(
-            "SELECT rate_to_eur FROM fx_rates WHERE currency = ? ORDER BY rate_date DESC LIMIT 1",
-            (currency,),
-        ).fetchone()
-        if fallback:
-            return fallback[0]
+        fallback = _latest_cached(conn, currency)
+        if fallback is not None:
+            return fallback
         raise FxRateUnavailable(f"No cached or live FX rate available for {currency!r}") from exc
 
     if currency not in rates:
+        fallback = _latest_cached(conn, currency)
+        if fallback is not None:
+            return fallback
         raise FxRateUnavailable(f"Frankfurter has no rate for currency {currency!r}")
 
     rate_to_eur = 1 / rates[currency]
