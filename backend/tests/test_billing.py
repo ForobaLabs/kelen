@@ -464,8 +464,9 @@ def test_updated_arriving_before_created_converges_to_latest_state(conn):
     assert apply_event(conn, created, now=NOW) == "stale"
     assert user(conn)["tier"] == "free"
     assert (
-        conn.execute("SELECT status FROM subscriptions WHERE provider_subscription_id='sub_1'")
-        .fetchone()[0]
+        conn.execute(
+            "SELECT status FROM subscriptions WHERE provider_subscription_id='sub_1'"
+        ).fetchone()[0]
         == "canceled"
     )
 
@@ -509,3 +510,52 @@ def test_event_cannot_rebind_a_subscription_to_another_user(conn):
         "SELECT user_id FROM subscriptions WHERE provider_subscription_id='sub_1'"
     ).fetchone()[0]
     assert owner == user(conn)["id"]
+
+
+def test_downgrade_keeps_data_and_locks_premium_features(conn):
+    """Premium -> free hides premium features but deletes nothing; resubscribing restores them."""
+    from auth.entitlements import REGISTRY, evaluate
+
+    uid = user(conn)["id"]
+    conn.execute(
+        "INSERT INTO whatif_scenarios (created_by_user_id, name, horizon_months, params_json) "
+        "VALUES (?, 'Raise', 12, '{}')",
+        (uid,),
+    )
+    conn.execute(
+        "INSERT INTO monthly_reports (user_id, year_month, trigger, status, narrative_text) "
+        "VALUES (?, '2026-10', 'manual', 'done', 'kept')",
+        (uid,),
+    )
+    conn.commit()
+    premium_keys = [k for k, v in REGISTRY.items() if v["tier"] == "premium"]
+    assert premium_keys
+
+    def reachable(u):  # premium features the user's audience can see
+        return [k for k in premium_keys if evaluate(k, u, gating_enabled=True).visible]
+
+    apply_event(conn, parse_paddle_event(payload()), now=NOW)
+    assert all(evaluate(k, user(conn), gating_enabled=True).unlocked for k in reachable(user(conn)))
+
+    cancel = payload(
+        event_id="evt_2",
+        etype="subscription.canceled",
+        status="canceled",
+        occurred="2026-11-02T10:00:00Z",
+    )
+    apply_event(conn, parse_paddle_event(cancel), now=NOW)
+    free = user(conn)
+    assert free["tier"] == "free"
+    assert reachable(free)  # still visible (shown as locked, with the upgrade path) ...
+    assert not any(evaluate(k, free, gating_enabled=True).unlocked for k in reachable(free))
+    # ... and nothing the user created is gone.
+    n_scen = conn.execute(
+        "SELECT COUNT(*) FROM whatif_scenarios WHERE created_by_user_id=?", (uid,)
+    )
+    assert n_scen.fetchone()[0] == 1
+    n_rep = conn.execute("SELECT narrative_text FROM monthly_reports WHERE user_id=?", (uid,))
+    assert n_rep.fetchone()[0] == "kept"
+
+    resub = payload(event_id="evt_3", sub="sub_2", occurred="2026-11-03T10:00:00Z")
+    apply_event(conn, parse_paddle_event(resub), now=NOW)
+    assert user(conn)["tier"] == "premium"
