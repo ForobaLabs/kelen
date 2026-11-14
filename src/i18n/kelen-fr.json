@@ -33,7 +33,8 @@
     "appearance": "Apparence",
     "language": "Langue",
     "currency": "Devise d'affichage",
-    "currencyHint": "À modifier dans les Paramètres"
+    "currencyHint": "À modifier dans les Paramètres",
+    "signOut": "Se déconnecter"
   },
   "sidebar": {
     "lightMode": "Mode clair",

@@ -33,7 +33,8 @@
     "appearance": "Aspetto",
     "language": "Lingua",
     "currency": "Valuta di visualizzazione",
-    "currencyHint": "Cambia nelle Impostazioni"
+    "currencyHint": "Cambia nelle Impostazioni",
+    "signOut": "Esci"
   },
   "sidebar": {
     "lightMode": "Modalità chiara",

@@ -33,7 +33,8 @@
     "appearance": "Appearance",
     "language": "Language",
     "currency": "Display currency",
-    "currencyHint": "Change in Settings"
+    "currencyHint": "Change in Settings",
+    "signOut": "Sign out"
   },
   "sidebar": {
     "lightMode": "Light mode",

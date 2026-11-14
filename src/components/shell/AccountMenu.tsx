@@ -1,8 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { Activity, HelpCircle, Lock, Monitor, Moon, Scale, Settings, Sun, User } from 'lucide-react';
+import { Activity, HelpCircle, Lock, LogOut, Monitor, Moon, Scale, Settings, Sun, User } from 'lucide-react';
 import { useTheme, useUserProfile, type SuiteProfile } from '@foroba/ui';
+import { logout } from '../../auth/api';
 
 const LANGUAGES = [
   { code: 'en', label: 'EN' },
@@ -59,6 +60,15 @@ export function AccountMenu({ profile }: { profile: SuiteProfile | null }) {
   const themeLabel =
     theme === 'dark' ? t('sidebar.darkMode') : theme === 'light' ? t('sidebar.lightMode') : t('sidebar.systemMode');
   const close = () => { setOpen(false); };
+  const signOut = async () => {
+    try {
+      await logout();
+    } catch {
+      // Offline or server error: still leave; the cookie expires and /login re-checks the session.
+    }
+    // Full navigation drops every cached query and in-memory token.
+    window.location.assign('/login');
+  };
 
   return (
     <div ref={rootRef} className="relative">
@@ -127,6 +137,11 @@ export function AccountMenu({ profile }: { profile: SuiteProfile | null }) {
           <button type="button" onClick={() => { setTheme(nextTheme); }} className={`${rowClass} w-full cursor-pointer border-0 bg-transparent text-left`}>
             <ThemeIcon size={16} aria-hidden="true" />
             {t('accountMenu.appearance')}: {themeLabel}
+          </button>
+
+          <button type="button" onClick={() => { void signOut(); }} className={`${rowClass} w-full cursor-pointer border-0 bg-transparent text-left`}>
+            <LogOut size={16} aria-hidden="true" />
+            {t('accountMenu.signOut')}
           </button>
 
           <p className="px-3 pb-1 pt-2 text-xs text-[var(--color-text-muted)]">{t('accountMenu.dataStays')}</p>

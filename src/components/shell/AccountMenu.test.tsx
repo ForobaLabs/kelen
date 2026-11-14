@@ -1,8 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n';
 import { AccountMenu } from './AccountMenu';
+
+const logout = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../auth/api', () => ({ logout: () => logout() }));
 
 describe('AccountMenu placement', () => {
   beforeAll(async () => {
@@ -30,5 +33,26 @@ describe('AccountMenu placement', () => {
     const panel = open();
     expect(panel.className).toContain('bottom-full');
     expect(panel.className).not.toContain('top-full');
+  });
+});
+
+describe('AccountMenu sign out (foroba#278)', () => {
+  beforeAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('ends the session server-side then sends the user to /login', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    render(
+      <MemoryRouter>
+        <AccountMenu profile={null} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /account menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/login'));
+    expect(logout).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 });
