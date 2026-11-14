@@ -12,7 +12,7 @@ def test_generate_secret_is_base32_and_unique():
 def test_provisioning_uri_contains_issuer_and_account():
     uri = provisioning_uri("SECRET234567", account="demo@foroba.app")
     assert uri.startswith("otpauth://totp/")
-    assert "Foroba" in uri
+    assert "Kelen" in uri
     assert "demo" in uri and "foroba.app" in uri
 
 

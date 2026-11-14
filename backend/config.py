@@ -138,7 +138,7 @@ class Settings(BaseSettings):
 
     # --- WebAuthn / Passkeys (MFA hardening, foroba#199) ---
     webauthn_rp_id: str = "localhost"
-    webauthn_rp_name: str = "Foroba"
+    webauthn_rp_name: str = "Kelen"
     # One origin, or a comma-separated list (every host that runs a passkey ceremony:
     # app/pazuru/tsumi/m under the shared RP ID). Read it through `webauthn_origins`.
     webauthn_origin: str = "http://localhost:5175"

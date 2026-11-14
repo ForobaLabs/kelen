@@ -147,7 +147,7 @@ class TestEmailTemplates:
         parts = _decoded_parts(msg)
         assert any("654321" in part for part in parts)
         # Italian translation should be present
-        assert any("Foroba" in part for part in parts)
+        assert any("Kelen" in part for part in parts)
 
     def test_send_email_change_email(self):
         email_service.send_email_change_email("new@example.com", "111222")

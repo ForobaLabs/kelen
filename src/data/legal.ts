@@ -29,7 +29,7 @@ Why: To display your household's financial overview and track progress against y
 Legal basis: Performance of a contract.
 
 Portfolio summary and market data
-What: Aggregated portfolio data displayed in Foroba's dashboard (sourced from Naforo and Yiriba). Market data (public tickers, prices) fetched from public providers.
+What: Aggregated portfolio data displayed in Kelen's dashboard (sourced from Naforo and Yiriba). Market data (public tickers, prices) fetched from public providers.
 Why: To provide a unified financial overview.
 Legal basis: Performance of a contract.
 Note: Market data API calls carry only public ticker symbols — no personal data is transmitted to market data providers.
@@ -74,7 +74,7 @@ Exceptions: if you opt in to cloud AI, masked prompts are processed by Cloudflar
 
 COOKIES
 We use two types of cookies, both strictly necessary:
-• suite_session — authentication; keeps you logged in across all three apps (Foroba, Naforo, Yiriba).
+• suite_session — authentication; keeps you logged in across all three apps (Kelen, Naforo, Yiriba).
 • stepup_pazuru / stepup_tsumi — step-up authentication tokens, issued by Foroba and consumed by satellite apps for sensitive operations.
 No advertising or analytics cookies are used.
 
@@ -107,7 +107,7 @@ AGE RESTRICTION
 This service is for adults aged 18 and older. By creating an account, you confirm you are at least 18 years old.
 
 NOT FINANCIAL ADVICE
-Personal Finance HUB (Foroba, Naforo, Yiriba) is a personal finance management suite — it is not a financial adviser or regulated financial service (other than in relation to account information as addressed in our regulatory disclosures).
+Personal Finance HUB (Kelen, Naforo, Yiriba) is a personal finance management suite — it is not a financial adviser or regulated financial service (other than in relation to account information as addressed in our regulatory disclosures).
 
 Market data, portfolio summaries, and any analytical outputs are for informational and organisational purposes only. Nothing in this service constitutes investment advice, financial advice, legal advice, or tax advice. Market data may be delayed and may not reflect real-time prices.
 
@@ -118,7 +118,7 @@ YOUR ACCOUNT
 • Notify us immediately if you suspect unauthorised access to your account.
 
 ACCOUNT DELETION
-You may delete your account and all associated data at any time via Settings → Security → Delete account. Deletion is permanent and covers your data across all three apps (Foroba, Naforo, Yiriba). Bank connections (Enable Banking) are revoked immediately on deletion.
+You may delete your account and all associated data at any time via Settings → Security → Delete account. Deletion is permanent and covers your data across all three apps (Kelen, Naforo, Yiriba). Bank connections (Enable Banking) are revoked immediately on deletion.
 
 YOUR DATA
 • You retain ownership of your personal financial data.
@@ -126,7 +126,7 @@ YOUR DATA
 • You may export your data at any time (CSV export in Naforo).
 
 SUITE ARCHITECTURE
-Foroba acts as the authentication authority for the suite. Your login, MFA, and session tokens are issued by Foroba and shared with Naforo and Yiriba. Account management (password change, MFA settings, account deletion) is performed in Foroba and applies to the entire suite.
+Kelen acts as the authentication authority for the suite. Your login, MFA, and session tokens are issued by Foroba and shared with Naforo and Yiriba. Account management (password change, MFA settings, account deletion) is performed in Kelen and applies to the entire suite.
 
 ACCEPTABLE USE
 You must not use this service to: violate any applicable law or regulation; attempt to gain unauthorised access to other users' accounts or data; reverse-engineer or copy the software for commercial use.

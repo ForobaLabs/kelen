@@ -397,7 +397,7 @@
   },
   "reConsent": {
     "title": "Documenti legali aggiornati",
-    "intro": "Le nostre Condizioni di servizio o l'Informativa sulla privacy sono state aggiornate dalla tua ultima visita. Leggile e accettale per continuare a usare Foroba.",
+    "intro": "Le nostre Condizioni di servizio o l'Informativa sulla privacy sono state aggiornate dalla tua ultima visita. Leggile e accettale per continuare a usare Kelen.",
     "excerpt": "{{title}} (estratto)",
     "agree": "Ho letto e accetto le Condizioni di servizio e l'Informativa sulla privacy aggiornate.",
     "error": "Impossibile registrare il tuo consenso. Riprova.",
@@ -405,7 +405,7 @@
     "accept": "Accetta e continua"
   },
   "login": {
-    "title": "Accedi a Foroba",
+    "title": "Accedi a Kelen",
     "email": "Email",
     "password": "Password",
     "showPassword": "Mostra password",
@@ -534,7 +534,7 @@
   },
   "profilePage": {
     "title": "Profilo",
-    "description": "La tua identità è condivisa tra Foroba, Naforo e Yiriba.",
+    "description": "La tua identità è condivisa tra Kelen, Naforo e Yiriba.",
     "changePhoto": "Cambia foto",
     "firstName": "Nome",
     "lastName": "Cognome",

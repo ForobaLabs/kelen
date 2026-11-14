@@ -32,7 +32,7 @@ export function useStatusPage() {
 
   const apps: AppStatus[] = [
     {
-      name: 'Foroba',
+      name: 'Kelen',
       status: toHealthStatus(foroba),
       lastChecked: foroba.dataUpdatedAt ? new Date(foroba.dataUpdatedAt).toISOString() : null,
     },

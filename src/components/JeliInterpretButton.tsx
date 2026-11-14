@@ -49,7 +49,7 @@ export function JeliInterpretButton({ contextLabel, buildContext }: JeliInterpre
         setText(
           res.status === 401
             ? 'Please log in first — Jeli uses your suite-wide session.'
-            : 'Jeli is unavailable. Make sure Ollama and the Foroba backend are running.',
+            : 'Jeli is unavailable. Make sure Ollama and the Kelen backend are running.',
         );
         return;
       }
@@ -64,7 +64,7 @@ export function JeliInterpretButton({ contextLabel, buildContext }: JeliInterpre
         setText(acc);
       }
     } catch {
-      setText('Connection error. Is the Foroba backend running?');
+      setText('Connection error. Is the Kelen backend running?');
     } finally {
       setLoading(false);
     }

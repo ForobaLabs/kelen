@@ -13,7 +13,7 @@ from datetime import datetime
 import pyotp
 import qrcode
 
-_ISSUER = "Foroba"
+_ISSUER = "Kelen"
 
 # Replay guard (pre-beta Task 2.2): the last accepted time-step per secret. A code is only
 # accepted for a step strictly newer than the last one, so an observed code cannot be

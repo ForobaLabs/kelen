@@ -1,4 +1,4 @@
-"""Email delivery for Foroba transactional emails (GL-8.1, foroba#184).
+"""Email delivery for Kelen transactional emails (GL-8.1, foroba#184).
 
 SMTP transport via Brevo (or any SMTP relay). Never raises — a transient SMTP
 failure must not flip an otherwise-successful operation to 'failed'. All SMTP
@@ -26,82 +26,82 @@ logger = logging.getLogger(__name__)
 
 _I18N: dict[str, dict[str, str]] = {
     "en": {
-        "otp_subject": "Your Foroba verification code",
+        "otp_subject": "Your Kelen verification code",
         "otp_heading": "Your verification code",
-        "otp_body": "Use the code below to complete your action on Foroba.",
+        "otp_body": "Use the code below to complete your action on Kelen.",
         "otp_expiry": "This code expires in {minutes} minutes.",
-        "verify_subject": "Verify your Foroba email address",
+        "verify_subject": "Verify your Kelen email address",
         "verify_heading": "Confirm your email",
-        "verify_body": "Welcome to Foroba! Use the code below to verify your email address.",
-        "email_change_subject": "Confirm your new Foroba email address",
+        "verify_body": "Welcome to Kelen! Use the code below to verify your email address.",
+        "email_change_subject": "Confirm your new Kelen email address",
         "email_change_heading": "Confirm email change",
         "email_change_body": (
             "Someone (hopefully you) requested to change the email address"
-            " on a Foroba account to this address. Use the code below to confirm."
+            " on a Kelen account to this address. Use the code below to confirm."
         ),
-        "invite_subject": "You've been invited to a Foroba household",
+        "invite_subject": "You've been invited to a Kelen household",
         "invite_heading": "Household invitation",
-        "invite_body": "{inviter} has invited you to join their household on Foroba.",
+        "invite_body": "{inviter} has invited you to join their household on Kelen.",
         "invite_cta": (
-            "Accept this invitation by logging in to Foroba and entering the code below,"
+            "Accept this invitation by logging in to Kelen and entering the code below,"
             " or by visiting your household settings."
         ),
         "no_action": "If you did not request this, you can safely ignore this email.",
         "footer": "This message was sent by Foroba. Do not reply to this email.",
     },
     "fr": {
-        "otp_subject": "Votre code de vérification Foroba",
+        "otp_subject": "Votre code de vérification Kelen",
         "otp_heading": "Votre code de vérification",
-        "otp_body": "Utilisez le code ci-dessous pour finaliser votre action sur Foroba.",
+        "otp_body": "Utilisez le code ci-dessous pour finaliser votre action sur Kelen.",
         "otp_expiry": "Ce code expire dans {minutes} minutes.",
-        "verify_subject": "Vérifiez votre adresse e-mail Foroba",
+        "verify_subject": "Vérifiez votre adresse e-mail Kelen",
         "verify_heading": "Confirmez votre e-mail",
         "verify_body": (
-            "Bienvenue sur Foroba\u00a0! Utilisez le code ci-dessous"
+            "Bienvenue sur Kelen\u00a0! Utilisez le code ci-dessous"
             " pour vérifier votre adresse e-mail."
         ),
-        "email_change_subject": "Confirmez votre nouvelle adresse e-mail Foroba",
+        "email_change_subject": "Confirmez votre nouvelle adresse e-mail Kelen",
         "email_change_heading": "Confirmation du changement d'e-mail",
         "email_change_body": (
-            "Une demande de changement d'adresse e-mail a été effectuée sur votre compte Foroba."
+            "Une demande de changement d'adresse e-mail a été effectuée sur votre compte Kelen."
             " Utilisez le code ci-dessous pour confirmer."
         ),
-        "invite_subject": "Vous avez été invité(e) dans un foyer Foroba",
+        "invite_subject": "Vous avez été invité(e) dans un foyer Kelen",
         "invite_heading": "Invitation au foyer",
-        "invite_body": "{inviter} vous invite à rejoindre son foyer sur Foroba.",
+        "invite_body": "{inviter} vous invite à rejoindre son foyer sur Kelen.",
         "invite_cta": (
-            "Acceptez cette invitation en vous connectant à Foroba"
+            "Acceptez cette invitation en vous connectant à Kelen"
             " et en saisissant le code ci-dessous."
         ),
         "no_action": (
             "Si vous n'êtes pas à l'origine de cette demande,"
             " ignorez simplement cet e-mail."
         ),
-        "footer": "Ce message a été envoyé par Foroba. Ne répondez pas à cet e-mail.",
+        "footer": "Ce message a été envoyé par Kelen. Ne répondez pas à cet e-mail.",
     },
     "it": {
-        "otp_subject": "Il tuo codice di verifica Foroba",
+        "otp_subject": "Il tuo codice di verifica Kelen",
         "otp_heading": "Il tuo codice di verifica",
-        "otp_body": "Usa il codice qui sotto per completare la tua azione su Foroba.",
+        "otp_body": "Usa il codice qui sotto per completare la tua azione su Kelen.",
         "otp_expiry": "Questo codice scade tra {minutes} minuti.",
-        "verify_subject": "Verifica il tuo indirizzo email Foroba",
+        "verify_subject": "Verifica il tuo indirizzo email Kelen",
         "verify_heading": "Conferma la tua email",
         "verify_body": (
-            "Benvenuto su Foroba! Usa il codice qui sotto"
+            "Benvenuto su Kelen! Usa il codice qui sotto"
             " per verificare il tuo indirizzo email."
         ),
-        "email_change_subject": "Conferma il tuo nuovo indirizzo email Foroba",
+        "email_change_subject": "Conferma il tuo nuovo indirizzo email Kelen",
         "email_change_heading": "Conferma cambio email",
         "email_change_body": (
-            "È stata richiesta la modifica dell'indirizzo email di un account Foroba"
+            "È stata richiesta la modifica dell'indirizzo email di un account Kelen"
             " a questo indirizzo. Usa il codice qui sotto per confermare."
         ),
-        "invite_subject": "Sei stato invitato in un nucleo familiare Foroba",
+        "invite_subject": "Sei stato invitato in un nucleo familiare Kelen",
         "invite_heading": "Invito al nucleo familiare",
-        "invite_body": "{inviter} ti ha invitato a unirti al suo nucleo familiare su Foroba.",
-        "invite_cta": "Accetta questo invito accedendo a Foroba e inserendo il codice qui sotto.",
+        "invite_body": "{inviter} ti ha invitato a unirti al suo nucleo familiare su Kelen.",
+        "invite_cta": "Accetta questo invito accedendo a Kelen e inserendo il codice qui sotto.",
         "no_action": "Se non hai richiesto questo, puoi ignorare questa email.",
-        "footer": "Questo messaggio è stato inviato da Foroba. Non rispondere a questa email.",
+        "footer": "Questo messaggio è stato inviato da Kelen. Non rispondere a questa email.",
     },
 }
 
@@ -135,7 +135,7 @@ _HTML_TEMPLATE = """\
 <table width="560" cellpadding="0" cellspacing="0"
        style="background:#1A1F2E;border-radius:8px;overflow:hidden;max-width:560px;width:100%;">
   <tr><td style="background:#0D9488;padding:24px 32px;">
-    <span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Foroba</span>
+    <span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Kelen</span>
   </td></tr>
   <tr><td style="padding:32px;">
     <h1 style="margin:0 0 16px;color:#F1F5F9;font-size:20px;font-weight:600;">{heading}</h1>

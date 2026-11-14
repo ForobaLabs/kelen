@@ -4,7 +4,7 @@ export const FOROBA_FAQ: FaqItem[] = [
   {
     question: 'What is Kelen?',
     answer:
-      'Kelen is your whole-wealth view in the Foroba suite. It brings together your bank accounts (via Naforo), your investment portfolio (via Yiriba), market data, and your AI assistant Jeli in a single place.',
+      'Kelen is your whole-wealth view in the Kelen suite. It brings together your bank accounts (via Naforo), your investment portfolio (via Yiriba), market data, and your AI assistant Jeli in a single place.',
     tags: ['overview', 'about'],
   },
   {
@@ -28,7 +28,7 @@ export const FOROBA_FAQ: FaqItem[] = [
   {
     question: 'Is my financial data shared with any external service?',
     answer:
-      'No. Foroba, Naforo, and Yiriba are all local-first and self-hosted. Bank sync uses Enable Banking under PSD2; market data comes from public, license-clean sources. AI requests stay on our server unless you opt in to cloud AI or add your own key, per feature, in Settings.',
+      'No. Kelen, Naforo, and Yiriba are all local-first and self-hosted. Bank sync uses Enable Banking under PSD2; market data comes from public, license-clean sources. AI requests stay on our server unless you opt in to cloud AI or add your own key, per feature, in Settings.',
     tags: ['privacy', 'security', 'data'],
   },
   {

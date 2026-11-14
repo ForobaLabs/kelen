@@ -9,7 +9,7 @@ export function StatusPage() {
       <SectionHeader
         as="h1"
         title="System status"
-        description="Live status of all Foroba suite services"
+        description="Live status of all Kelen suite services"
         className="mb-6"
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
