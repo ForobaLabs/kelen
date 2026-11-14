@@ -67,6 +67,9 @@ export function useJeli(userName?: string) {
       if (res.status === 429 && res.headers.get('X-AI-Notice') === 'daily_limit') {
         throw new Error('DAILY_LIMIT');
       }
+      if (res.status === 429 && res.headers.get('X-AI-Notice') === 'busy') {
+        throw new Error('BUSY');
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (!res.body) throw new Error('No response body');
 
@@ -106,9 +109,11 @@ export function useJeli(userName?: string) {
         const key =
           msg === 'DAILY_LIMIT'
             ? 'jeli.dailyLimit'
-            : msg.startsWith('HTTP')
-              ? 'jeli.unavailable'
-              : 'jeli.unreachable';
+            : msg === 'BUSY'
+              ? 'jeli.busy'
+              : msg.startsWith('HTTP')
+                ? 'jeli.unavailable'
+                : 'jeli.unreachable';
         const friendly = i18n.t(key);
         setError(friendly);
         setMessages((prev) => {

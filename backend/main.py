@@ -54,7 +54,7 @@ from goals_router import router as goals_router
 from handoff_router import internal_router as handoff_internal_router
 from handoff_router import router as handoff_router
 from jeli_output_guard import sanitize_reply
-from jeli_service import build_system_prompt, gather_context, stream_chat
+from jeli_service import JeliBusy, build_system_prompt, gather_context, stream_chat
 from lab_router import router as lab_router
 from monthly_report_router import router as monthly_report_router
 from observability import init_error_tracking
@@ -432,6 +432,13 @@ async def jeli_chat(
             {"detail": {"code": "daily_limit", "message": "Daily Jeli message limit reached."}},
             status_code=429,
             headers={"X-AI-Notice": "daily_limit"},
+        )
+    except JeliBusy:
+        # Local model saturated: shed load with a retryable 429 rather than time out.
+        return JSONResponse(
+            {"detail": {"code": "busy", "message": "Jeli is busy, try again in a minute."}},
+            status_code=429,
+            headers={"X-AI-Notice": "busy", "Retry-After": "30"},
         )
     context_text = f"{pazuru_ctx}\n{tsumi_ctx}"
     return Response(

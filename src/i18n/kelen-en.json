@@ -51,7 +51,8 @@
     "newChat": "Start a new chat",
     "unavailable": "Jeli isn't available right now. Check that the assistant service is running, then try again.",
     "unreachable": "We couldn't reach Jeli. Check your connection and try again.",
-    "dailyLimit": "You've used today's free Jeli messages. They reset tomorrow — Premium adds more."
+    "dailyLimit": "You've used today's free Jeli messages. They reset tomorrow — Premium adds more.",
+    "busy": "Jeli is busy right now. Please try again in a minute."
   },
   "switcher": {
     "kelen": "Net worth, goals, simulation",

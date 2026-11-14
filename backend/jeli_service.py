@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -135,7 +136,47 @@ def build_system_prompt(
 # ---------------------------------------------------------------------------
 
 
+class JeliBusy(Exception):
+    """All local-model slots are taken and the queue wait expired (→ HTTP 429)."""
+
+
+_ollama_gate: asyncio.Semaphore | None = None
+
+
+def _reset_ollama_gate() -> None:
+    global _ollama_gate
+    _ollama_gate = None
+
+
+def _gate() -> asyncio.Semaphore:
+    global _ollama_gate
+    if _ollama_gate is None:
+        _ollama_gate = asyncio.Semaphore(max(1, settings.ollama_max_concurrency))
+    return _ollama_gate
+
+
+@contextlib.asynccontextmanager
+async def _ollama_slot(wait: float | None = None) -> AsyncIterator[None]:
+    """Hold one local-model slot; raise JeliBusy if none frees up within `wait` seconds."""
+    gate = _gate()
+    timeout = settings.ollama_queue_wait_seconds if wait is None else wait
+    try:
+        await asyncio.wait_for(gate.acquire(), timeout=timeout)
+    except TimeoutError:
+        raise JeliBusy from None
+    try:
+        yield
+    finally:
+        gate.release()
+
+
 async def stream_chat(system_prompt: str, message: str) -> AsyncIterator[str]:
+    async with _ollama_slot():
+        async for piece in _stream_chat_unbounded(system_prompt, message):
+            yield piece
+
+
+async def _stream_chat_unbounded(system_prompt: str, message: str) -> AsyncIterator[str]:
     payload = {
         "model": settings.ollama_model,
         "messages": [
@@ -210,7 +251,8 @@ async def _ollama_narrative(system_prompt: str, message: str) -> str:
         ],
         "stream": False,
     }
-    async with httpx.AsyncClient(
+    # Background reports queue behind interactive chat (long wait) rather than shedding.
+    async with _ollama_slot(wait=300.0), httpx.AsyncClient(
         timeout=httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
     ) as client:
         resp = await client.post(f"{settings.ollama_base_url}/api/chat", json=payload)

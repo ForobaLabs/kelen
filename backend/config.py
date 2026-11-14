@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     # pazuru/ARCHITECTURE_DECISIONS.md ADR-002 for the full benchmark table. The
     # prior default, phi3.5:latest, crashed the whole Ollama process under load.
     ollama_model: str = "qwen2.5:3b-instruct"
+    # Task 4.3: the shared VPS Ollama serves one model on few cores. Cap concurrent
+    # generations per backend process and shed the overflow with a friendly 429
+    # instead of letting requests pile up until they time out.
+    ollama_max_concurrency: int = 2
+    ollama_queue_wait_seconds: float = 20.0
 
     # --- Subscription billing (BR-12). Off by default: routes return 503 and no
     # tier is ever changed by a payment event until explicitly enabled. ---

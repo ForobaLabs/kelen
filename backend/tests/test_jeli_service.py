@@ -111,3 +111,59 @@ async def test_fetch_context_reports_empty_data():
 @pytest.mark.asyncio
 async def test_fetch_context_offline():
     assert "offline" in await _ctx(503, "Naforo")
+
+
+@pytest.mark.asyncio
+async def test_stream_chat_sheds_load_when_ollama_slots_are_taken(monkeypatch):
+    """Task 4.3: beyond the concurrency cap, a request waits briefly then is refused with
+    JeliBusy (→ friendly 429) instead of piling onto a shared Ollama until it times out."""
+    import asyncio
+
+    from config import settings
+
+    monkeypatch.setattr(settings, "ollama_max_concurrency", 1)
+    monkeypatch.setattr(settings, "ollama_queue_wait_seconds", 0.05)
+    jeli_service._reset_ollama_gate()
+    release = asyncio.Event()
+
+    class _SlowResp:
+        def raise_for_status(self):
+            pass
+
+        async def aiter_lines(self):
+            await release.wait()
+            yield '{"message": {"content": "hi"}, "done": true}'
+
+    class _Ctx:
+        async def __aenter__(self):
+            return _SlowResp()
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(httpx.AsyncClient, "stream", lambda self, m, u, **k: _Ctx())
+
+    first = asyncio.create_task(_collect(jeli_service.stream_chat("s", "a")))
+    await asyncio.sleep(0.01)  # first request now holds the only slot
+    with pytest.raises(jeli_service.JeliBusy):
+        await _collect(jeli_service.stream_chat("s", "b"))
+    release.set()
+    assert await first == ["hi"]
+    # slot is released afterwards: a third request succeeds
+    assert await _collect(jeli_service.stream_chat("s", "c")) == ["hi"]
+
+
+@pytest.mark.asyncio
+async def test_stream_chat_releases_slot_when_ollama_fails(monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "ollama_max_concurrency", 1)
+    monkeypatch.setattr(settings, "ollama_queue_wait_seconds", 0.05)
+    jeli_service._reset_ollama_gate()
+    monkeypatch.setattr(
+        httpx.AsyncClient,
+        "stream",
+        lambda self, m, u, **k: _RaisingStreamCtx(httpx.ConnectError("down")),
+    )
+    for _ in range(3):  # would deadlock/JeliBusy on the 2nd call if the slot leaked
+        assert await _collect(jeli_service.stream_chat("s", "x")) == []

@@ -57,3 +57,28 @@ def test_chat_returns_429_daily_limit_when_free_cap_is_spent(monkeypatch):
         assert response.headers["X-AI-Notice"] == "daily_limit"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_chat_returns_429_busy_when_ollama_queue_is_saturated(monkeypatch):
+    import jeli_service
+    import main
+
+    monkeypatch.setattr(main, "gather_context", _fake_gather_context)
+
+    async def _busy(system_prompt, message):
+        raise jeli_service.JeliBusy
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(main, "stream_chat", _busy)
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1, "email": "u1@test.local"}
+    try:
+        response = TestClient(app).post(
+            "/chat",
+            json={"message": "hi", "user_name": "Test", "personality": {"tone": 5, "expertise": 5}},
+        )
+        assert response.status_code == 429
+        assert response.json()["detail"]["code"] == "busy"
+        assert response.headers["X-AI-Notice"] == "busy"
+        assert response.headers["Retry-After"] == "30"
+    finally:
+        app.dependency_overrides.clear()

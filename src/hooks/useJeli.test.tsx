@@ -26,4 +26,22 @@ describe('useJeli daily limit', () => {
     expect(i18n.t('jeli.dailyLimit')).not.toBe('jeli.dailyLimit');
     expect(result.current.error).toBe(i18n.t('jeli.dailyLimit'));
   });
+
+  it('shows the friendly busy message on HTTP 429 busy', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: { code: 'busy' } }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'X-AI-Notice': 'busy' },
+        }),
+      ),
+    );
+    const { result } = renderHook(() => useJeli('Ada'));
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+    expect(result.current.messages.at(-1)!.content).toBe(i18n.t('jeli.busy'));
+    expect(i18n.t('jeli.busy')).not.toBe('jeli.busy');
+  });
 });
