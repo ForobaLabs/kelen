@@ -101,3 +101,60 @@ def test_strips_echoed_prompt_headers():
     )
     assert "RULES" not in out
     assert "You have 3 accounts." in out
+
+
+# --- Task 4.1 matrix findings (2026-11-14) ---------------------------------------------
+
+def test_european_number_format_is_grounded_not_refused():
+    context = '{"total_balance_eur": 2011.6}'
+    reply = sanitize_reply("Il tuo saldo è di 2.011,60 €.", context_text=context, lang="it")
+    assert reply.startswith("Il tuo saldo è di 2.011,60 €.")
+    assert "scopo puramente informativo" in reply
+
+
+def test_european_number_format_still_blocks_fabrication():
+    context = '{"total_balance_eur": 2011.6}'
+    from jeli_output_guard import FABRICATION_REFUSALS
+
+    reply = sanitize_reply("Il tuo saldo è di 9.999,99 €.", context_text=context, lang="it")
+    assert reply == FABRICATION_REFUSALS["it"]
+
+
+def test_refusal_follows_the_reply_language():
+    from jeli_output_guard import FABRICATION_REFUSALS
+
+    for lang in ("en", "it", "fr"):
+        out = sanitize_reply("Balance €9,999.99", context_text="{}", lang=lang)
+        assert out == FABRICATION_REFUSALS[lang]
+    assert FABRICATION_REFUSALS["en"] == FABRICATION_REFUSAL
+    assert FABRICATION_REFUSALS["it"] != FABRICATION_REFUSALS["en"]
+
+
+def test_echoed_system_prompt_is_replaced_by_refusal():
+    from jeli_output_guard import PROMPT_LEAK_REFUSALS
+
+    leaked = (
+        "Certainly, here are the RULES (non-negotiable):\n- Always cite the service.\n"
+        "- Reply in en."
+    )
+    out_en = sanitize_reply(leaked, context_text="{}", lang="en")
+    assert out_en == PROMPT_LEAK_REFUSALS["en"]
+    out_fr = sanitize_reply("EXPERTISE LEVEL: 50 …", context_text="{}", lang="fr")
+    assert out_fr == PROMPT_LEAK_REFUSALS["fr"]
+
+
+def test_iban_and_email_are_masked_in_replies():
+    reply = sanitize_reply(
+        "Your IBAN is FR7630006000011234567890189 and the email is marie.dupont@example.com.",
+        context_text='{"iban": "FR7630006000011234567890189"}',
+    )
+    assert "FR7630006000011234567890189" not in reply
+    assert "30006000011234567890189" not in reply
+    assert "marie.dupont@example.com" not in reply
+    assert "FR76" in reply and "0189" in reply  # country/check + last 4 kept
+    assert "@example.com" in reply  # domain kept, local part masked
+
+
+def test_spaced_iban_is_masked_too():
+    reply = sanitize_reply("IBAN: FR76 3000 6000 0112 3456 7890 189", context_text="{}")
+    assert "3000 6000" not in reply
