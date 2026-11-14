@@ -64,6 +64,9 @@ export function useJeli(userName?: string) {
         signal: abortRef.current.signal,
       });
 
+      if (res.status === 429 && res.headers.get('X-AI-Notice') === 'daily_limit') {
+        throw new Error('DAILY_LIMIT');
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (!res.body) throw new Error('No response body');
 
@@ -99,8 +102,14 @@ export function useJeli(userName?: string) {
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        const serverSide = err instanceof Error && err.message.startsWith('HTTP');
-        const friendly = i18n.t(serverSide ? 'jeli.unavailable' : 'jeli.unreachable');
+        const msg = err instanceof Error ? err.message : '';
+        const key =
+          msg === 'DAILY_LIMIT'
+            ? 'jeli.dailyLimit'
+            : msg.startsWith('HTTP')
+              ? 'jeli.unavailable'
+              : 'jeli.unreachable';
+        const friendly = i18n.t(key);
         setError(friendly);
         setMessages((prev) => {
           const updated = [...prev];

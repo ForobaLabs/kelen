@@ -123,13 +123,13 @@ def test_pref_local_never_calls_provider(api):
 
 
 @respx.mock
-def test_free_user_over_allowance_routes_local_with_notice(api):
+def test_premium_user_over_allowance_routes_local_with_notice(api):
     enable()
     conn = db.connect()
     from auth import Caller
 
-    usage.record(conn, Caller(7, "free", False), "pazuru", "chat", "chat", "cloudflare",
-                 "m", 20000, 5, "ok", at="2026-10-02T10:00:00+00:00")
+    usage.record(conn, Caller(7, "premium", False), "pazuru", "chat", "chat", "cloudflare",
+                 "m", 300000, 5, "ok", at="2026-10-02T10:00:00+00:00")
     route = respx.post(CF_URL).mock(return_value=ok())
     res = api("POST", "/v1/chat", json=body()).json()
     assert res["route"] == "local" and res["meta"]["notice"] == "plan_quota_exhausted"
@@ -303,3 +303,25 @@ def test_chat_requires_auth():
 
 def test_unknown_feature_is_422(api):
     assert api("POST", "/v1/chat", json=body(feature="nope")).status_code == 422
+
+
+@respx.mock
+def test_free_user_cloud_pref_routes_local_with_plan_notice(api):
+    enable()
+    route = respx.post(CF_URL).mock(return_value=ok())
+    res = api("POST", "/v1/chat", tier="free", json=body()).json()
+    assert res["route"] == "local" and res["meta"]["notice"] == "plan_quota_exhausted"
+    assert not route.called
+
+
+def test_free_tier_local_route_is_metered_at_10_per_day(api, monkeypatch):
+    monkeypatch.setenv("AI_RATE_LIMIT_PER_MIN", "100")
+    for _ in range(10):
+        res = api("POST", "/v1/chat", tier="free", json=body()).json()
+        assert res == {"route": "local", "meta": {"notice": None}}
+    res = api("POST", "/v1/chat", tier="free", json=body()).json()
+    assert res["route"] == "local" and res["meta"]["notice"] == "daily_limit"
+    # premium users are not metered on the local route
+    assert api("POST", "/v1/chat", tier="premium", user=9, json=body()).json()["meta"] == {
+        "notice": None
+    }

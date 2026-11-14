@@ -19,6 +19,17 @@ from auth.dependencies import _token_from_header
 logger = logging.getLogger(__name__)
 
 
+DAILY_LIMIT = "daily_limit"
+
+
+class DailyLimitReached(Exception):
+    """The gateway refused a local-route call: the free tier's daily message cap is spent.
+
+    Raised instead of running Ollama so the cap is real. Call sites turn it into a friendly
+    HTTP 429 (or an error frame); it never carries user content.
+    """
+
+
 @dataclass
 class KnownEntities:
     persons: list[str] = field(default_factory=list)
@@ -98,6 +109,8 @@ async def _complete(
             model=meta.get("model", ""),
             notice=meta.get("notice"),
         )
+    if meta.get("notice") == DAILY_LIMIT:
+        raise DailyLimitReached
     out = await local()
     out.notice = meta.get("notice")
     return out
@@ -163,6 +176,8 @@ async def stream(
                     )
                     return
                 notice = meta.get("notice")
+                if notice == DAILY_LIMIT:
+                    raise DailyLimitReached
     except (GatewayUnavailable, GatewayRejected) as exc:
         notice = _unavailable(exc)
         if emitted:

@@ -414,17 +414,25 @@ async def jeli_chat(
         ai_router.jwt_from(request.headers.get("authorization"), suite_session),
         feature="jeli",
     )
-    full_reply, meta = await ai_router.collect(
-        ai_router.stream(
-            ctx,
-            task="chat",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.message},
-            ],
-            local_stream=lambda: stream_chat(system_prompt, req.message),
+    try:
+        full_reply, meta = await ai_router.collect(
+            ai_router.stream(
+                ctx,
+                task="chat",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": req.message},
+                ],
+                local_stream=lambda: stream_chat(system_prompt, req.message),
+            )
         )
-    )
+    except ai_router.DailyLimitReached:
+        # Free tier spent its daily Jeli messages; the client renders a friendly banner.
+        return JSONResponse(
+            {"detail": {"code": "daily_limit", "message": "Daily Jeli message limit reached."}},
+            status_code=429,
+            headers={"X-AI-Notice": "daily_limit"},
+        )
     context_text = f"{pazuru_ctx}\n{tsumi_ctx}"
     return Response(
         sanitize_reply(full_reply, context_text=context_text, lang=req.lang),

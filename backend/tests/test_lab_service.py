@@ -240,3 +240,21 @@ async def test_run_lab_turn_reports_busy_when_sandbox_saturated(monkeypatch):
     assert events[-1]["type"] == "error"
     assert "busy" in events[-1]["value"].lower()
     assert generate_calls["n"] == 1  # no retry burned on a capacity error
+
+
+@pytest.mark.asyncio
+async def test_run_lab_turn_stops_at_once_on_daily_limit(monkeypatch):
+    import ai_router
+
+    monkeypatch.setattr(sandbox_docker, "is_docker_running", lambda: True)
+    calls = []
+
+    async def capped(*a, **k):
+        calls.append(1)
+        raise ai_router.DailyLimitReached
+
+    monkeypatch.setattr(lab_service, "_generate_code_routed", capped)
+    ctx = ai_router.AiContext(jwt="j", app="foroba", feature="lab")
+    events = await _collect(lab_service.run_lab_turn("q", {}, [], "", ai_ctx=ctx))
+    assert len(calls) == 1  # no retry burn
+    assert events[-1]["type"] == "error" and events[-1]["code"] == "daily_limit"

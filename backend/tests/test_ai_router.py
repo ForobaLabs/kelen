@@ -262,3 +262,48 @@ async def test_lab_codegen_uses_lab_feature(monkeypatch):
     out = await lab_service._generate_code_routed(ctx, "q", ["df"], [], "", None, None)
     assert out == {"code": "x=1", "explanation": "e"}
     assert captured == {"app": "foroba", "feature": "lab", "task": "tools", "json_mode": True}
+
+
+@respx.mock
+async def test_daily_limit_notice_blocks_local_run():
+    """Free tier at its local daily cap: the gateway says route=local + daily_limit, and
+    Kelen must NOT run Ollama (the cap would be meaningless)."""
+    respx.post(f"{BASE}/v1/chat").mock(
+        return_value=httpx.Response(
+            200, json={"route": "local", "meta": {"notice": "daily_limit"}}
+        )
+    )
+    ran = []
+
+    async def _local_spy():
+        ran.append(1)
+        return ai_router.AiOutcome(text="local text")
+
+    with pytest.raises(ai_router.DailyLimitReached):
+        await ai_router.complete(
+            _ctx(), task="chat", messages=[{"role": "user", "content": "x"}], local=_local_spy
+        )
+    assert ran == []
+
+
+@respx.mock
+async def test_stream_daily_limit_notice_blocks_local_stream():
+    body = _sse(("route", {"route": "local"}), ("done", {"meta": {"notice": "daily_limit"}}))
+    respx.post(f"{BASE}/v1/chat/stream").mock(return_value=httpx.Response(200, text=body))
+    ran = []
+
+    async def _spy():
+        ran.append(1)
+        yield "never"
+
+    with pytest.raises(ai_router.DailyLimitReached):
+        _ = [
+            f
+            async for f in ai_router.stream(
+                _ctx(),
+                task="chat",
+                messages=[{"role": "user", "content": "x"}],
+                local_stream=_spy,
+            )
+        ]
+    assert ran == []

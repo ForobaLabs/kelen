@@ -50,7 +50,8 @@
     "stop": "Arrêter",
     "newChat": "Nouvelle conversation",
     "unavailable": "Jeli n'est pas disponible pour le moment. Vérifiez que le service assistant fonctionne, puis réessayez.",
-    "unreachable": "Impossible de joindre Jeli. Vérifiez votre connexion et réessayez."
+    "unreachable": "Impossible de joindre Jeli. Vérifiez votre connexion et réessayez.",
+    "dailyLimit": "Vous avez utilisé les messages Jeli gratuits d'aujourd'hui. Ils se renouvellent demain — Premium en ajoute."
   },
   "switcher": {
     "kelen": "Patrimoine, objectifs, simulation",

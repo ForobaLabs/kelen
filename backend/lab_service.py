@@ -251,6 +251,9 @@ async def _attempt_turn(
                 error_feedback,
                 web_results,
             )
+    except ai_router.DailyLimitReached:
+        msg = "Daily Jeli message limit reached."
+        return {"ok": False, "code": "", "error": msg, "limit": True}
     except Exception as exc:
         return {"ok": False, "code": "", "error": str(exc)}
 
@@ -353,6 +356,10 @@ async def run_lab_turn(
             if ai_ctx is not None and ai_ctx.last_meta:
                 done["ai_meta"] = ai_ctx.last_meta
             yield done
+            return
+
+        if result.get("limit"):
+            yield {"type": "error", "value": result["error"], "code": "daily_limit"}
             return
 
         if result.get("busy"):

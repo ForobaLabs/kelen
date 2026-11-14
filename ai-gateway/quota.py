@@ -64,19 +64,36 @@ def check_detail(conn, caller: Caller, mode: str) -> tuple[str | None, str | Non
     s = get_settings()
     if _rate_limited(caller.user_id):
         return "cloud_unavailable", "rate"
-    if mode != "cloud":
+    moment = usage.now()
+    unlimited = caller.user_id in s.test_allowlist
+    if mode == "local":
+        if (
+            not unlimited
+            and caller.tier != "premium"
+            and usage.user_day_messages(conn, caller.user_id, moment, local=True)
+            >= s.daily_free_local_messages
+        ):
+            return "plan_quota_exhausted", "daily"
         return None, None
+    if mode != "cloud":
+        return None, None  # BYOK: the user's own key, never metered
     if breaker_open():
         return "cloud_unavailable", "breaker"
-    moment = usage.now()
+    if usage.budget(conn, moment)["percent"] >= 100:
+        return "cloud_unavailable", "budget"
     if (
         usage.suite_month_neurons(conn, moment) >= s.cf_monthly_neurons
         or usage.suite_day_neurons(conn, moment) >= s.cf_daily_soft_neurons
     ):
         return "cloud_unavailable", "suite"
-    if caller.user_id not in s.test_allowlist and usage.user_month_neurons(
-        conn, caller.user_id, moment
-    ) >= usage.allowance_for(caller.tier):
+    if unlimited:
+        return None, None
+    cap = s.daily_premium_cloud_messages if caller.tier == "premium" else s.daily_free_cloud_messages
+    if cap <= 0:
+        return "plan_quota_exhausted", "tier"
+    if usage.user_day_messages(conn, caller.user_id, moment, local=False) >= cap:
+        return "plan_quota_exhausted", "daily"
+    if usage.user_month_neurons(conn, caller.user_id, moment) >= usage.allowance_for(caller.tier):
         return "plan_quota_exhausted", "allowance"
     return None, None
 

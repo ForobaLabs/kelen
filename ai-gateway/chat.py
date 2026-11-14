@@ -134,9 +134,14 @@ async def _prepare(conn, caller: Caller, body: ChatIn) -> Plan | Local:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     res = prefs.resolve(conn, caller, body.app, body.feature)
-    if res.mode == "local":
-        return Local(res.notice)
     started = time.monotonic()
+    if res.mode == "local":
+        notice, reason = quota.check_detail(conn, caller, "local")
+        if reason == "daily":
+            _ledger(conn, caller, body, "local", "", 0, started, "blocked_daily")
+            return Local("daily_limit")
+        _ledger(conn, caller, body, "local", "", 0, started, "local")
+        return Local(res.notice)
     notice, reason = quota.check_detail(conn, caller, res.mode)
     targets: list[Target] = []
     if res.mode == "cloud":

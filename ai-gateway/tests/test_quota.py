@@ -90,3 +90,59 @@ def test_breaker_survives_restart():
     assert quota.check(conn, PREMIUM, "cloud") is None
     quota.load_breaker(conn)
     assert quota.check(conn, PREMIUM, "cloud") == "cloud_unavailable"
+
+
+TODAY = "2026-10-15T09:00:00+00:00"
+YESTERDAY = "2026-10-14T23:00:00+00:00"
+
+
+def _rows(conn, caller, n, provider="cloudflare", outcome="ok", at=TODAY):
+    for _ in range(n):
+        usage.record(conn, caller, "pazuru", "chat", "chat", provider, "m", 1, 5, outcome, at=at)
+
+
+def test_quota_by_tier(monkeypatch):
+    conn = db.connect()
+    # free: cloud is not part of the plan; local is capped at 10 messages per UTC day
+    assert quota.check_detail(conn, FREE, "cloud") == ("plan_quota_exhausted", "tier")
+    _rows(conn, FREE, 9, "local", "local")
+    _rows(conn, FREE, 50, "local", "local", at=YESTERDAY)
+    assert quota.check_detail(conn, FREE, "local") == (None, None)
+    _rows(conn, FREE, 1, "local", "local")
+    assert quota.check_detail(conn, FREE, "local") == ("plan_quota_exhausted", "daily")
+    # premium: cloud capped at 100 messages per UTC day, BYOK and local never counted
+    _rows(conn, PREMIUM, 99)
+    _rows(conn, PREMIUM, 300, "openai", "ok")  # BYOK traffic does not eat the cloud cap
+    assert quota.check_detail(conn, PREMIUM, "cloud") == (None, None)
+    _rows(conn, PREMIUM, 1)
+    assert quota.check_detail(conn, PREMIUM, "cloud") == ("plan_quota_exhausted", "daily")
+    # BYOK is unlimited for every tier
+    assert quota.check_detail(conn, FREE, "byok") == (None, None)
+    assert quota.check_detail(conn, PREMIUM, "byok") == (None, None)
+
+
+def test_allowlisted_user_bypasses_tier_limits(monkeypatch):
+    monkeypatch.setenv("AI_TEST_ALLOWLIST", "7")
+    conn = db.connect()
+    _rows(conn, FREE, 30, "local", "local")
+    assert quota.check_detail(conn, FREE, "cloud") == (None, None)
+    assert quota.check_detail(conn, FREE, "local") == (None, None)
+
+
+def test_monthly_eur_cap_blocks_cloud_and_flags_alert_at_80_percent(monkeypatch):
+    monkeypatch.setenv("AI_MONTHLY_EUR_CAP", "10")
+    monkeypatch.setenv("CF_AI_MONTHLY_NEURONS", "5000000")
+    monkeypatch.setenv("CF_AI_DAILY_SOFT_NEURONS", "5000000")
+    conn = db.connect()
+    other = Caller(99, "premium", False)
+    _seed(conn, other, 799_999)
+    assert quota.check_detail(conn, PREMIUM, "cloud") == (None, None)
+    assert usage.budget(conn, NOW)["alert"] is False
+    _seed(conn, other, 1)  # 800k neurons == 8.00 EUR == 80 %
+    b = usage.budget(conn, NOW)
+    assert b == {"cap_eur": 10.0, "used_eur": 8.0, "percent": 80, "alert": True}
+    assert quota.check_detail(conn, PREMIUM, "cloud") == (None, None)
+    _seed(conn, other, 200_000)  # 1M neurons == 10.00 EUR == cap
+    assert quota.check_detail(conn, PREMIUM, "cloud") == ("cloud_unavailable", "budget")
+    # the cap never blocks local or BYOK
+    assert quota.check_detail(conn, PREMIUM, "byok") == (None, None)

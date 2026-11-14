@@ -69,3 +69,22 @@ def test_ledger_row_has_no_prompt_text():
         "id", "user_id", "tier", "app", "feature", "task", "provider", "model",
         "neurons", "latency_ms", "outcome", "at",
     }
+
+
+def test_admin_usage_per_day_cost_and_synthetic_exclusion(api, monkeypatch):
+    monkeypatch.setenv("AI_SYNTHETIC_USER_IDS", "99")
+    import config
+    config.get_settings.cache_clear()
+    conn = db.connect()
+    _rec(conn, U7, 100, at="2026-10-05T10:00:00+00:00")
+    _rec(conn, Caller(99, "premium", False), 500, at="2026-10-05T11:00:00+00:00")
+    _rec(conn, U7, 50, at="2026-10-06T10:00:00+00:00")
+    body = api("GET", "/v1/admin/usage?month=2026-10", admin=True).json()
+    assert body["totals"] == {"neurons": 150, "requests": 2, "users": 1}
+    assert body["by_day"] == [
+        {"day": "2026-10-05", "requests": 1, "neurons": 100, "cost_eur": 0.001},
+        {"day": "2026-10-06", "requests": 1, "neurons": 50, "cost_eur": 0.0005},
+    ]
+    assert body["cost_eur"] == 0.0015
+    # the budget is real spend: synthetic traffic uses the same Cloudflare account
+    assert body["budget"] == {"cap_eur": 10.0, "used_eur": 0.0065, "percent": 0, "alert": False}

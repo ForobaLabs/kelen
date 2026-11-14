@@ -34,6 +34,17 @@ class Settings(BaseSettings):
         60000, validation_alias="CF_AI_DAILY_SOFT_NEURONS"
     )
 
+    daily_free_local_messages: int = Field(10, validation_alias="AI_DAILY_FREE_LOCAL_MESSAGES")
+    daily_free_cloud_messages: int = Field(0, validation_alias="AI_DAILY_FREE_CLOUD_MESSAGES")
+    daily_premium_cloud_messages: int = Field(
+        100, validation_alias="AI_DAILY_PREMIUM_CLOUD_MESSAGES"
+    )
+    monthly_eur_cap: float = Field(10.0, validation_alias="AI_MONTHLY_EUR_CAP")
+    eur_per_1k_neurons: float = Field(0.01, validation_alias="AI_EUR_PER_1K_NEURONS")
+    synthetic_user_ids: Annotated[set[int], NoDecode] = Field(
+        default_factory=set, validation_alias="AI_SYNTHETIC_USER_IDS"
+    )
+
     test_allowlist: Annotated[set[int], NoDecode] = Field(
         default_factory=set, validation_alias="AI_TEST_ALLOWLIST"
     )
@@ -58,7 +69,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field("", validation_alias="GEMINI_API_KEY")
     model_fallback: str = Field("gemini-3.5-flash-lite", validation_alias="AI_MODEL_FALLBACK")
 
-    @field_validator("test_allowlist", mode="before")
+    @field_validator("test_allowlist", "synthetic_user_ids", mode="before")
     @classmethod
     def _parse_allowlist(cls, v):
         if isinstance(v, str):

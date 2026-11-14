@@ -82,14 +82,14 @@ def _reset_quota_state():
 
 @pytest.fixture
 def api(make_token):
-    """Authenticated call helper: api("POST", "/v1/chat", user=7, tier="free", json=...)."""
+    """Authenticated call helper: api("POST", "/v1/chat", user=7, tier="premium", json=...)."""
     from fastapi.testclient import TestClient
 
     from main import app
 
     client = TestClient(app)
 
-    def call(method, path, user=7, tier="free", admin=False, **kw):
+    def call(method, path, user=7, tier="premium", admin=False, **kw):
         headers = {
             "X-AI-Gateway-Token": GATEWAY_TOKEN,
             "Authorization": "Bearer "
