@@ -167,3 +167,11 @@ async def test_stream_chat_releases_slot_when_ollama_fails(monkeypatch):
     )
     for _ in range(3):  # would deadlock/JeliBusy on the 2nd call if the slot leaked
         assert await _collect(jeli_service.stream_chat("s", "x")) == []
+
+
+def test_system_prompt_forbids_guaranteed_return_claims():
+    """Task 4.1 matrix (ar6): the local model called bonds/CDs a 'guaranteed return'."""
+    import jeli_service
+
+    p = jeli_service.build_system_prompt("", "", "Ada", 5, 5, "en").lower()
+    assert "guaranteed" in p and "risk-free" in p
