@@ -597,5 +597,17 @@
     "never": "At this pace the target isn't reached within 30 years.",
     "reach": "At this pace the target is reached around {{date}} ({{months}} months).",
     "expires": "Link valid until {{date}}. Read-only; it contains only the figures above."
+  },
+  "verifyEmail": {
+    "title": "Verify your email",
+    "body": "Enter the 6-digit code we sent to confirm your address.",
+    "codeLabel": "Verification code",
+    "verify": "Verify",
+    "verifying": "Verifying…",
+    "resend": "Resend code",
+    "resent": "A new code is on its way.",
+    "invalid": "That code is invalid or has expired.",
+    "unavailable": "Email delivery is unavailable right now. Please try again later.",
+    "error": "Something went wrong. Please try again."
   }
 }

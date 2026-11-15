@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BillingSection } from './BillingSection';
+import { VerifyEmailCard } from '../components/VerifyEmailCard';
 import { ProfileEditor, useUserProfile, useSuiteProfile, PageContainer, SectionHeader, FinanceLevelBadge } from '@foroba/ui';
 
 // GL-12: this page only renders within Foroba itself, so nginx's /jeli/*
@@ -100,6 +101,8 @@ export function ProfilePage() {
             {saving ? t('profilePage.saving') : t('profilePage.saveName')}
           </button>
         </div>
+
+        <VerifyEmailCard />
 
         <BillingSection />
 

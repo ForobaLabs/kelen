@@ -21,7 +21,7 @@ test('data-page keys exist in en, it and fr', () => {
 });
 
 test('position-detail and profile-page keys exist in en, it and fr', () => {
-  for (const section of ['positionDetail', 'profilePage'] as const) {
+  for (const section of ['positionDetail', 'profilePage', 'verifyEmail'] as const) {
     const keys = flat(en[section]).sort();
     expect(keys.length).toBeGreaterThan(5);
     expect(flat(it[section]).sort()).toEqual(keys);

@@ -597,5 +597,17 @@
     "never": "À ce rythme, l'objectif n'est pas atteint en 30 ans.",
     "reach": "À ce rythme, l'objectif est atteint vers {{date}} ({{months}} mois).",
     "expires": "Lien valable jusqu'au {{date}}. Lecture seule ; il ne contient que les chiffres ci-dessus."
+  },
+  "verifyEmail": {
+    "title": "Vérifiez votre e-mail",
+    "body": "Saisissez le code à 6 chiffres que nous vous avons envoyé pour confirmer votre adresse.",
+    "codeLabel": "Code de vérification",
+    "verify": "Vérifier",
+    "verifying": "Vérification…",
+    "resend": "Renvoyer le code",
+    "resent": "Un nouveau code est en route.",
+    "invalid": "Ce code est invalide ou a expiré.",
+    "unavailable": "L'envoi d'e-mails est indisponible pour le moment. Réessayez plus tard.",
+    "error": "Une erreur est survenue. Réessayez."
   }
 }

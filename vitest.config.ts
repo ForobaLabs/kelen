@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     setupFiles: ['./src/test/setup.ts'],
     // Process @foroba/ui through Vite so the dedupe above applies to its imports.
     server: { deps: { inline: [/@foroba\/ui/] } },

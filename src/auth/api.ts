@@ -99,6 +99,25 @@ export async function completeOnboarding(): Promise<void> {
   await fetch("/jeli/auth/onboarding/complete", { ...opts, method: "POST" });
 }
 
+export class EmailDeliveryUnavailableError extends Error {}
+
+/** Confirm the signup email with the 6-digit code mailed at registration. */
+export async function verifyEmail(code: string): Promise<void> {
+  const r = await fetch("/jeli/auth/verify-email", {
+    ...opts,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!r.ok) throw new Error("invalid or expired code");
+}
+
+export async function resendVerification(): Promise<void> {
+  const r = await fetch("/jeli/auth/resend-verification", { ...opts, method: "POST" });
+  if (r.status === 503) throw new EmailDeliveryUnavailableError("email delivery unavailable");
+  if (!r.ok) throw new Error("failed to resend code");
+}
+
 export async function logout(): Promise<void> {
   await fetch("/jeli/auth/logout", { ...opts, method: "POST" });
 }
