@@ -26,7 +26,7 @@ from apscheduler.triggers.cron import CronTrigger
 import db
 import monthly_report_service as mrs
 from auth import keys
-from auth.conn import get_conn
+from auth.conn import get_thread_conn
 from auth.entitlements import evaluate
 from auth.repository import list_all_users
 from auth.security import create_token
@@ -78,7 +78,7 @@ async def _generate_for_user(conn, user: dict, year_month: str, token: str) -> N
 
 
 async def _generate_all_monthly_reports_async() -> None:
-    conn = get_conn()
+    conn = get_thread_conn()
     year_month = date.today().strftime("%Y-%m")
     runtime = get_all(conn)
     gating_enabled = runtime.get("premium_gating_enabled", "false") == "true"

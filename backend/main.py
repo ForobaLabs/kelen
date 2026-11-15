@@ -33,10 +33,10 @@ from admin_router import router as admin_router
 from ai_proxy_router import router as ai_proxy_router
 from auth import keys
 from auth.api_keys_router import router as api_keys_router
+from auth.conn import get_conn, get_thread_conn
 from auth.dependencies import get_current_user, require_admin
 from auth.entitlements_router import require_feature
 from auth.entitlements_router import router as entitlements_router
-from auth.router import get_conn
 from auth.router import router as auth_router
 from auth.token_router import router as token_router
 from auth.webhooks_router import router as webhooks_router
@@ -182,7 +182,7 @@ app.include_router(ai_proxy_router)
 
 @app.on_event("startup")
 def _startup() -> None:
-    conn = get_conn()
+    conn = get_thread_conn()
     # foroba#214: mock/seed accounts must never be created in hosted (prod) mode.
     # foroba#254: additionally purge any dev seed rows that may have been created
     # before the hosted guard existed — ensures known-password accounts are scrubbed
@@ -217,7 +217,7 @@ class ChatRequest(BaseModel):
 
 async def _check_db() -> str:
     def _query() -> None:
-        conn = get_conn()
+        conn = get_thread_conn()
         conn.execute("SELECT 1")
 
     try:

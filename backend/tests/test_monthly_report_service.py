@@ -195,7 +195,7 @@ def test_run_generation_in_background_fetches_own_conn_and_runs(monkeypatch, con
     monkeypatch.setattr(jeli_service, "gather_context", _fake_gather_context)
     monkeypatch.setattr(jeli_service, "generate_narrative", _fake_generate_narrative)
     monkeypatch.setattr(mrs, "send_email", lambda *a, **k: None)
-    monkeypatch.setattr(mrs, "get_conn", lambda: conn)
+    monkeypatch.setattr(mrs, "get_thread_conn", lambda: conn)
     row = mrs.start_new_report(conn, _USER, "2026-07", "manual")
 
     mrs.run_generation_in_background(row["id"], _USER, cookie=None)

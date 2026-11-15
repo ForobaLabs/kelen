@@ -13,13 +13,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 import fx_service
-from auth.conn import get_conn
+from auth.conn import get_thread_conn
 
 logger = logging.getLogger("foroba.fx_scheduler")
 
 
 def _refresh_job() -> None:
-    conn = get_conn()
+    conn = get_thread_conn()
     fx_service.refresh_latest_rates(conn)
 
 

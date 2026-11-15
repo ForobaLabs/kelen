@@ -15,7 +15,7 @@ from pathlib import Path
 
 import db
 import jeli_service
-from auth.conn import get_conn
+from auth.conn import get_thread_conn
 from config import settings
 from email_service import send_email
 from jeli_output_guard import sanitize_reply
@@ -153,7 +153,7 @@ def run_generation_in_background(
     """Sync entry point for FastAPI's BackgroundTasks, which runs it on its own
     worker thread (not the request's) — mirrors report_scheduler.py's
     sync-wrapper-over-asyncio.run pattern for the same reason: fetch a fresh
-    thread-local conn via get_conn() here rather than reusing the request's
+    thread-local conn via get_thread_conn() here rather than reusing the request's
     connection object, since that object is tied to whichever thread served the
     request and reusing it from a different thread would reintroduce the
     cross-thread shared-connection race fixed in foroba#170 (see auth/conn.py)."""
@@ -172,7 +172,7 @@ async def _run_generation_in_background_async(
     stepup_pazuru: str | None,
     stepup_tsumi: str | None,
 ) -> None:
-    conn = get_conn()
+    conn = get_thread_conn()
     row = db.get_monthly_report(conn, report_id, user_id=user["id"])
     if row is None:
         logger.error(

@@ -20,7 +20,7 @@ from apscheduler.triggers.cron import CronTrigger
 import backup_orchestrator
 import offsite_backup
 from auth import keys
-from auth.conn import get_conn
+from auth.conn import get_thread_conn
 from auth.repository import list_all_users
 from auth.security import create_token
 from config import settings
@@ -34,7 +34,7 @@ async def _run_daily_backup_async() -> None:
         logger.info("Offsite backup scheduler: R2 not configured, skipping run.")
         return
 
-    conn = get_conn()
+    conn = get_thread_conn()
     admin = next((u for u in list_all_users(conn) if u.get("is_admin")), None)
     if admin is None:
         logger.warning("Offsite backup scheduler: no admin user found, skipping run.")

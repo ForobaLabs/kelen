@@ -24,7 +24,7 @@ def test_skips_when_offsite_backup_not_configured(monkeypatch):
 
 def test_skips_when_no_admin_user_exists(monkeypatch):
     monkeypatch.setattr(sched.offsite_backup, "is_configured", lambda: True)
-    monkeypatch.setattr(sched, "get_conn", lambda: object())
+    monkeypatch.setattr(sched, "get_thread_conn", lambda: object())
     monkeypatch.setattr(
         sched,
         "list_all_users",
@@ -46,7 +46,7 @@ def test_skips_when_no_admin_user_exists(monkeypatch):
 
 def test_happy_path_exports_and_uploads(monkeypatch):
     monkeypatch.setattr(sched.offsite_backup, "is_configured", lambda: True)
-    monkeypatch.setattr(sched, "get_conn", lambda: object())
+    monkeypatch.setattr(sched, "get_thread_conn", lambda: object())
     monkeypatch.setattr(
         sched,
         "list_all_users",
@@ -100,7 +100,7 @@ def test_happy_path_exports_and_uploads(monkeypatch):
 
 def test_happy_path_logs_and_does_not_raise_on_export_failure(monkeypatch):
     monkeypatch.setattr(sched.offsite_backup, "is_configured", lambda: True)
-    monkeypatch.setattr(sched, "get_conn", lambda: object())
+    monkeypatch.setattr(sched, "get_thread_conn", lambda: object())
     monkeypatch.setattr(
         sched,
         "list_all_users",
@@ -121,7 +121,7 @@ def test_happy_path_logs_and_does_not_raise_on_export_failure(monkeypatch):
 
 def test_prune_failure_does_not_fail_the_backup(monkeypatch, caplog):
     monkeypatch.setattr(sched.offsite_backup, "is_configured", lambda: True)
-    monkeypatch.setattr(sched, "get_conn", lambda: object())
+    monkeypatch.setattr(sched, "get_thread_conn", lambda: object())
     admin = {"id": 2, "is_admin": 1, "tier": "free", "audience": "base"}
     monkeypatch.setattr(sched, "list_all_users", lambda conn: [admin])
     monkeypatch.setattr(sched.keys, "get_keypair", lambda settings: ("p", "q", "k"))

@@ -22,7 +22,7 @@ def purge_expired(conn, now_days: int | None = None) -> dict[str, int]:
     """Delete rows older than ttl_days. Returns {table: rows_deleted}.
 
     Args:
-        conn: sqlite3 connection (in tests: in-memory; in prod: from get_conn())
+        conn: sqlite3 connection (in tests: in-memory; in prod: from get_thread_conn())
         now_days: override TTL for all rules (used in tests to control 'now')
     """
     deleted: dict[str, int] = {}
@@ -43,12 +43,12 @@ def start_retention_scheduler() -> None:
     """Wire the retention job into APScheduler (runs daily at 03:30)."""
     from apscheduler.schedulers.background import BackgroundScheduler
 
-    from auth.conn import get_conn
+    from auth.conn import get_thread_conn
 
     sched = BackgroundScheduler()
 
     def _run() -> None:
-        with get_conn() as conn:
+        with get_thread_conn() as conn:
             purge_expired(conn)
 
     sched.add_job(_run, "cron", hour=3, minute=30)

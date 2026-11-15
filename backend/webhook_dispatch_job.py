@@ -29,7 +29,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 import db
 import notification_service
 from auth import keys
-from auth.conn import get_conn
+from auth.conn import get_thread_conn
 from auth.repository import get_user_by_id
 from auth.security import create_token
 from config import settings
@@ -125,7 +125,7 @@ async def _deliver_event(client, conn, webhook: dict, event: dict) -> None:
 
 
 async def _dispatch_all_async() -> None:
-    conn = get_conn()
+    conn = get_thread_conn()
     active_webhooks = db.list_active_webhooks(conn)
     if not active_webhooks:
         return
