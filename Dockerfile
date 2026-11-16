@@ -30,7 +30,7 @@ ENV VITE_DEPLOYMENT_MODE=$VITE_DEPLOYMENT_MODE
 RUN pnpm build
 
 # ── Stage 3: Python backend ──────────────────────────────────────────────────
-FROM python:3.12-slim AS backend
+FROM python:3.15-slim AS backend
 WORKDIR /app/backend
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir pip==26.2 && pip install --no-cache-dir -r requir
 COPY foroba/backend/ .
 
 # ── Stage 4: Final image ──────────────────────────────────────────────────────
-FROM python:3.12-slim AS final
+FROM python:3.15-slim AS final
 WORKDIR /app
 
 # libsqlcipher1 (runtime .so, not -dev) — the sqlcipher3 wheel compiled in the
