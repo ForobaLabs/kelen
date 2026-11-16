@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 WORKDIR /app
 
 # sqlcipher3 compiles against libsqlcipher; keep only the runtime .so in the final image. One layer,
