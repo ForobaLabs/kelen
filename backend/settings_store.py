@@ -40,6 +40,22 @@ def init_settings(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+# Keys the unauthenticated GET /jeli/admin/settings may expose (AW-4 / H-4). Anything
+# not listed here is private by default; add a key only when a client needs it pre-login.
+PUBLIC_KEYS: frozenset[str] = frozenset(
+    {
+        "premium_gating_enabled",
+        "onboarding_mifid_enabled",
+        "require_invite_code",
+        "lab_service_enabled",
+    }
+)
+
+
+def get_public(conn: sqlite3.Connection) -> dict[str, str]:
+    return {k: v for k, v in get_all(conn).items() if k in PUBLIC_KEYS}
+
+
 def get_all(conn: sqlite3.Connection) -> dict[str, str]:
     rows = conn.execute("SELECT key, value FROM runtime_settings").fetchall()
     return {r["key"]: r["value"] for r in rows}

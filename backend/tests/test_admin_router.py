@@ -260,3 +260,47 @@ def test_revoke_unknown_invite_code_returns_404(setup):
     tc.app.dependency_overrides[get_current_user] = lambda: admin
     resp = tc.delete("/admin/invite-codes/999999")
     assert resp.status_code == 404
+
+
+# --- AW-4 / H-4: the unauthenticated settings read exposes an allowlist only ---
+
+
+def test_public_settings_only_allowlisted(setup):
+    import settings_store
+
+    tc, conn, _, _ = setup
+    settings_store.set_value(conn, "low_balance_threshold_cents", "5000")
+    data = tc.get("/jeli/admin/settings").json()
+    assert data and set(data) <= settings_store.PUBLIC_KEYS
+    assert "low_balance_threshold_cents" not in data
+
+
+def test_new_key_is_private_by_default(setup):
+    import settings_store
+
+    tc, conn, _, _ = setup
+    conn.execute(
+        "INSERT INTO runtime_settings (key, value, updated_at) VALUES ('future_secret', 'x', 'now')"
+    )
+    conn.commit()
+    assert "future_secret" not in tc.get("/jeli/admin/settings").json()
+    assert "future_secret" not in settings_store.get_public(conn)
+
+
+def test_internal_settings_requires_token(setup, monkeypatch):
+    from config import settings
+
+    tc, _conn, _, _ = setup
+    monkeypatch.setattr(settings, "internal_api_token", "t" * 40)
+    assert tc.get("/internal/settings").status_code == 403
+    assert tc.get("/internal/settings", headers={"X-Internal-Token": "wrong"}).status_code == 403
+    ok = tc.get("/internal/settings", headers={"X-Internal-Token": "t" * 40})
+    assert ok.status_code == 200 and "low_balance_threshold_cents" in ok.json()
+
+
+def test_internal_settings_fails_closed_when_token_unset(setup, monkeypatch):
+    from config import settings
+
+    tc, *_ = setup
+    monkeypatch.setattr(settings, "internal_api_token", "")
+    assert tc.get("/internal/settings", headers={"X-Internal-Token": ""}).status_code == 403

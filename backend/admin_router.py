@@ -32,8 +32,9 @@ from auth.dependencies import require_admin
 from auth.models import AdminKpis, InviteCode, InviteCodeCreateRequest, UserPublic
 from auth.reauth import ReauthBody, verify_reauth
 from config import settings
+from handoff_router import _require_internal_token
 from rate_limit import limiter
-from settings_store import DEFAULT_SETTINGS, get_all, set_value
+from settings_store import DEFAULT_SETTINGS, get_all, get_public, set_value
 
 router = APIRouter(tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -165,8 +166,14 @@ def admin_set_account_disabled(
 
 @router.get("/jeli/admin/settings")
 def public_get_settings(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
-    """Unauthenticated read — for Pazuru/Tsumi SettingsCache polling, and so
-    RegisterPage can check `require_invite_code` before rendering that field."""
+    """Unauthenticated read of the PUBLIC_KEYS allowlist only (AW-4 / H-4): the
+    SettingsCache clients and RegisterPage (`require_invite_code`) need nothing more."""
+    return get_public(conn)
+
+
+@router.get("/internal/settings", dependencies=[Depends(_require_internal_token)])
+def internal_get_settings(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, str]:
+    """Every runtime setting, for server-to-server callers (X-Internal-Token)."""
     return get_all(conn)
 
 
