@@ -24,9 +24,10 @@ EXPECTED = [
     (admin_router.admin_set_account_disabled, "30 per 1 minute"),
     (admin_router.admin_create_invite_code, "30 per 1 minute"),
     (admin_router.admin_revoke_invite_code, "30 per 1 minute"),
-    (admin_router.admin_import_backup, "30 per 1 minute"),
-    (admin_router.admin_export_suite, "30 per 1 minute"),
-    (admin_router.admin_import_suite, "30 per 1 minute"),
+    (admin_router.admin_export_backup, "3 per 1 hour"),
+    (admin_router.admin_import_backup, "3 per 1 hour"),
+    (admin_router.admin_export_suite, "3 per 1 hour"),
+    (admin_router.admin_import_suite, "3 per 1 hour"),
 ]
 
 

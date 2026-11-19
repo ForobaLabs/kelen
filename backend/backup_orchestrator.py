@@ -38,12 +38,16 @@ class InvalidPassphrase(Exception):
     pass
 
 
+class StepUpRequired(Exception):
+    """Pazuru/Tsumi step-up cookies missing: refuse rather than build a partial archive."""
+
+
 def _derive_key(passphrase: str, salt: bytes) -> bytes:
     kdf = Scrypt(salt=salt, length=32, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P)
     return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
 
 
-def _encrypt(data: bytes, passphrase: str) -> bytes:
+def encrypt_archive(data: bytes, passphrase: str) -> bytes:
     salt = os.urandom(_SALT_LEN)
     key = _derive_key(passphrase, salt)
     token = Fernet(key).encrypt(data)
@@ -93,7 +97,10 @@ async def _post_import(
 async def export_suite(passphrase: str, cookie: str, stepup: dict[str, str] | None = None) -> bytes:
     """`stepup` maps app name -> app-scoped step-up token; Pazuru/Tsumi answer 428
     to admin backup export without one."""
-    foroba_blob = export_archive()
+    missing = [n for n in ("pazuru", "tsumi") if not (stepup or {}).get(n)]
+    if missing:
+        raise StepUpRequired("Verify step-up for Naforo and Yiriba first")
+    foroba_blob = export_archive(include_keys=True)  # disaster-recovery copy, always encrypted
     async with httpx.AsyncClient() as client:
         pazuru_blob = await _fetch_export(
             client, settings.pazuru_api_url, cookie, (stepup or {}).get("pazuru")
@@ -122,7 +129,7 @@ async def export_suite(passphrase: str, cookie: str, stepup: dict[str, str] | No
             info.mtime = int(time.time())
             tar.addfile(info, io.BytesIO(content))
 
-    return _encrypt(outer.getvalue(), passphrase)
+    return encrypt_archive(outer.getvalue(), passphrase)
 
 
 async def import_suite(

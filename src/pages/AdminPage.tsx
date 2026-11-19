@@ -17,7 +17,7 @@ import { fetchPazuruHealthDetailed } from '../api/pazuru';
 import { fetchTsumiHealthDetailed } from '../api/tsumi';
 import { useAuth } from '../auth/AuthProvider';
 
-type Tab = 'flags' | 'users' | 'invites' | 'kpis' | 'backup' | 'status';
+type Tab = 'flags' | 'users' | 'invites' | 'kpis' | 'backup' | 'audit' | 'status';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'flags', label: 'Flags' },
@@ -25,6 +25,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'invites', label: 'Invites' },
   { id: 'kpis', label: 'KPIs' },
   { id: 'backup', label: 'Backup' },
+  { id: 'audit', label: 'Audit log' },
   { id: 'status', label: 'Status' },
 ];
 
@@ -78,6 +79,7 @@ export default function AdminPage(): React.ReactElement {
       {activeTab === 'invites' && <AdminInvitesPanel />}
       {activeTab === 'kpis' && <AdminKpisPanel />}
       {activeTab === 'backup' && <AdminBackupPanel />}
+      {activeTab === 'audit' && <AdminAuditPanel />}
       {activeTab === 'status' && <AdminStatusPanel />}
     </PageContainer>
   );
@@ -283,16 +285,39 @@ function AdminKpisPanel(): React.ReactElement {
   );
 }
 
+const MIN_PASSPHRASE = 12;
+
+async function errorMessage(resp: Response, fallback: string): Promise<string> {
+  try {
+    const body = await resp.json();
+    if (body && typeof body.detail === 'string') return body.detail;
+  } catch {
+    /* non-JSON error body */
+  }
+  return `${fallback} (${resp.status})`;
+}
+
 function AdminBackupPanel(): React.ReactElement {
+  const [exportPassword, setExportPassword] = useState('');
+  const [exportTotp, setExportTotp] = useState('');
   const [exportPassphrase, setExportPassphrase] = useState('');
+  const [exportConfirm, setExportConfirm] = useState('');
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
+  const [importPassword, setImportPassword] = useState('');
+  const [importTotp, setImportTotp] = useState('');
   const [importPassphrase, setImportPassphrase] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+
+  const exportReady =
+    !!exportPassword &&
+    exportTotp.length >= 6 &&
+    exportPassphrase.length >= MIN_PASSPHRASE &&
+    exportPassphrase === exportConfirm;
 
   async function handleExport() {
     setExportBusy(true);
@@ -302,9 +327,13 @@ function AdminBackupPanel(): React.ReactElement {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ passphrase: exportPassphrase }),
+        body: JSON.stringify({
+          password: exportPassword,
+          totp_code: exportTotp,
+          passphrase: exportPassphrase,
+        }),
       });
-      if (!resp.ok) throw new Error(`Export failed (${resp.status})`);
+      if (!resp.ok) throw new Error(await errorMessage(resp, 'Export failed'));
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -314,6 +343,7 @@ function AdminBackupPanel(): React.ReactElement {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setExportTotp('');
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -334,14 +364,17 @@ function AdminBackupPanel(): React.ReactElement {
     try {
       const form = new FormData();
       form.append('file', importFile);
+      form.append('password', importPassword);
+      form.append('totp_code', importTotp);
       form.append('passphrase', importPassphrase);
       const resp = await fetch('/jeli/admin/backup/import-suite', {
         method: 'POST',
         credentials: 'same-origin',
         body: form,
       });
-      if (!resp.ok) throw new Error(`Restore failed (${resp.status})`);
+      if (!resp.ok) throw new Error(await errorMessage(resp, 'Restore failed'));
       setImportResult(await resp.json());
+      setImportTotp('');
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Restore failed');
     } finally {
@@ -351,20 +384,44 @@ function AdminBackupPanel(): React.ReactElement {
 
   return (
     <div className="space-y-8 max-w-xl">
-      <section>
+      <section className="space-y-2">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Export backup</h3>
         <p className="text-sm text-[var(--color-text-secondary)] mb-3">
-          Downloads one encrypted file containing Kelen, Naforo, and Yiriba data.
-          The passphrase is never stored anywhere — write it down, you'll need it to restore.
+          Downloads one encrypted file containing Kelen, Naforo, and Yiriba data, including the
+          signing keys (disaster-recovery copy). Confirm it is you with your password and a fresh
+          authenticator code. The passphrase is never stored anywhere — write it down, you'll need
+          it to restore. Verify step-up for Naforo and Yiriba first.
         </p>
+        <PasswordInput
+          value={exportPassword}
+          onChange={(e) => setExportPassword(e.target.value)}
+          placeholder="Your password"
+          autoComplete="current-password"
+        />
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={8}
+          value={exportTotp}
+          onChange={(e) => setExportTotp(e.target.value.trim())}
+          placeholder="Authenticator code"
+          className="w-full px-3 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
+        />
         <PasswordInput
           value={exportPassphrase}
           onChange={(e) => setExportPassphrase(e.target.value)}
-          placeholder="Backup passphrase"
+          placeholder={`Backup passphrase (${MIN_PASSPHRASE}+ characters)`}
+          autoComplete="new-password"
+        />
+        <PasswordInput
+          value={exportConfirm}
+          onChange={(e) => setExportConfirm(e.target.value)}
+          placeholder="Repeat passphrase"
+          autoComplete="new-password"
         />
         <button
           onClick={handleExport}
-          disabled={exportBusy || !exportPassphrase}
+          disabled={exportBusy || !exportReady}
           className="px-4 py-2 rounded bg-[var(--color-accent)] text-white text-sm font-medium disabled:opacity-50"
         >
           {exportBusy ? 'Exporting…' : 'Export backup'}
@@ -372,7 +429,7 @@ function AdminBackupPanel(): React.ReactElement {
         {exportError && <p className="text-sm text-[var(--color-negative)] mt-2">{exportError}</p>}
       </section>
 
-      <section>
+      <section className="space-y-2">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">Restore backup</h3>
         <p className="text-sm text-[var(--color-text-secondary)] mb-3">
           Overwrites live data on all 3 apps. All 3 backends need a manual restart after restoring.
@@ -380,17 +437,36 @@ function AdminBackupPanel(): React.ReactElement {
         <input
           type="file"
           accept=".pfhbak"
+          aria-label="Backup file"
           onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
           className="w-full mb-2 text-sm text-[var(--color-text-primary)]"
         />
         <PasswordInput
+          value={importPassword}
+          onChange={(e) => setImportPassword(e.target.value)}
+          placeholder="Restore: your password"
+          autoComplete="current-password"
+        />
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={8}
+          value={importTotp}
+          onChange={(e) => setImportTotp(e.target.value.trim())}
+          placeholder="Restore: authenticator code"
+          className="w-full px-3 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
+        />
+        <PasswordInput
           value={importPassphrase}
           onChange={(e) => setImportPassphrase(e.target.value)}
-          placeholder="Backup passphrase"
+          placeholder="Restore: backup passphrase"
+          autoComplete="off"
         />
         <button
           onClick={handleImport}
-          disabled={importBusy || !importFile || !importPassphrase}
+          disabled={
+            importBusy || !importFile || !importPassword || importTotp.length < 6 || !importPassphrase
+          }
           className="px-4 py-2 rounded bg-[var(--color-negative)] text-white text-sm font-medium disabled:opacity-50"
         >
           {importBusy ? 'Restoring…' : 'Restore backup'}
@@ -402,6 +478,65 @@ function AdminBackupPanel(): React.ReactElement {
           </pre>
         )}
       </section>
+    </div>
+  );
+}
+
+interface AuditRow {
+  id: number;
+  admin_user_id: number;
+  action: string;
+  target: string | null;
+  detail: string | null;
+  ip: string | null;
+  created_at: string;
+}
+
+function AdminAuditPanel(): React.ReactElement {
+  const [rows, setRows] = useState<AuditRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/jeli/admin/audit-log', { credentials: 'same-origin' })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await errorMessage(r, 'Could not load audit log'));
+        return r.json();
+      })
+      .then(setRows)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load audit log'));
+  }, []);
+
+  if (error) return <p className="text-sm text-[var(--color-negative)]">{error}</p>;
+  if (!rows) return <p className="text-sm text-[var(--color-text-secondary)]">Loading…</p>;
+  if (rows.length === 0)
+    return <p className="text-sm text-[var(--color-text-secondary)]">No admin actions recorded yet.</p>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left">
+        <thead className="text-[var(--color-text-secondary)]">
+          <tr>
+            <th className="py-2 pr-4">When (UTC)</th>
+            <th className="py-2 pr-4">Admin</th>
+            <th className="py-2 pr-4">Action</th>
+            <th className="py-2 pr-4">Target</th>
+            <th className="py-2 pr-4">Detail</th>
+            <th className="py-2">IP</th>
+          </tr>
+        </thead>
+        <tbody className="text-[var(--color-text-primary)]">
+          {rows.map((r) => (
+            <tr key={r.id} className="border-t border-[var(--color-border)]">
+              <td className="py-2 pr-4 tabular-nums">{r.created_at}</td>
+              <td className="py-2 pr-4">{r.admin_user_id}</td>
+              <td className="py-2 pr-4">{r.action}</td>
+              <td className="py-2 pr-4">{r.target ?? '—'}</td>
+              <td className="py-2 pr-4">{r.detail ?? '—'}</td>
+              <td className="py-2">{r.ip ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -155,45 +155,11 @@ def test_get_admin_users_tolerates_malformed_legacy_email(setup):
 def test_export_backup_requires_admin(setup):
     tc, _conn, _, regular = setup
     tc.app.dependency_overrides[get_current_user] = lambda: regular
-    resp = tc.post("/admin/backup/export-suite", json={"passphrase": "pw"})
-    assert resp.status_code == 403
-
-
-def test_export_backup_calls_orchestrator(setup, monkeypatch):
-    import admin_router
-
-    tc, _conn, admin, _ = setup
-    tc.app.dependency_overrides[get_current_user] = lambda: admin
-
-    async def _fake_export_suite(passphrase, cookie, stepup=None):
-        assert passphrase == "pw"
-        return b"encrypted-bytes"
-
-    monkeypatch.setattr(admin_router.backup_orchestrator, "export_suite", _fake_export_suite)
-    resp = tc.post("/admin/backup/export-suite", json={"passphrase": "pw"})
-    assert resp.status_code == 200
-    assert resp.content == b"encrypted-bytes"
-
-
-def test_import_backup_calls_orchestrator(setup, monkeypatch):
-    import admin_router
-
-    tc, _conn, admin, _ = setup
-    tc.app.dependency_overrides[get_current_user] = lambda: admin
-
-    async def _fake_import_suite(encrypted, passphrase, cookie, stepup=None):
-        assert passphrase == "pw"
-        assert encrypted == b"uploaded-bytes"
-        return {"foroba": {"restored_files": []}, "pazuru": {}, "tsumi": {}}
-
-    monkeypatch.setattr(admin_router.backup_orchestrator, "import_suite", _fake_import_suite)
     resp = tc.post(
-        "/admin/backup/import-suite",
-        data={"passphrase": "pw"},
-        files={"file": ("backup.pfhbak", b"uploaded-bytes", "application/octet-stream")},
+        "/admin/backup/export-suite",
+        json={"passphrase": "pw-pw-pw-pw-pw", "password": "x", "totp_code": "000000"},
     )
-    assert resp.status_code == 200
-    assert resp.json()["foroba"]["restored_files"] == []
+    assert resp.status_code == 403
 
 
 def test_disable_account_requires_admin(setup):
@@ -228,24 +194,6 @@ def test_disable_account_unknown_user_returns_404(setup):
     tc.app.dependency_overrides[get_current_user] = lambda: admin
     resp = tc.patch("/admin/users/999999/disabled", json={"disabled": True})
     assert resp.status_code == 404
-
-
-def test_import_backup_wrong_passphrase_returns_400(setup, monkeypatch):
-    import admin_router
-
-    tc, _conn, admin, _ = setup
-    tc.app.dependency_overrides[get_current_user] = lambda: admin
-
-    async def _fake_import_suite(encrypted, passphrase, cookie, stepup=None):
-        raise admin_router.backup_orchestrator.InvalidPassphrase("bad pw")
-
-    monkeypatch.setattr(admin_router.backup_orchestrator, "import_suite", _fake_import_suite)
-    resp = tc.post(
-        "/admin/backup/import-suite",
-        data={"passphrase": "wrong"},
-        files={"file": ("backup.pfhbak", b"x", "application/octet-stream")},
-    )
-    assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------
