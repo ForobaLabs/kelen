@@ -51,7 +51,7 @@ def test_send_email_logs_when_disabled(caplog):
     settings.smtp_enabled = False
     with caplog.at_level(logging.INFO):
         email_service.send_email("user@test.local", "Subject", "Body")
-    assert "would send email to user@test.local" in caplog.text
+    assert "would send email to us***@test.local" in caplog.text
     assert FakeSMTP.instances == []
 
 
@@ -113,3 +113,18 @@ def test_send_email_does_not_raise_on_smtp_failure(monkeypatch, caplog):
         email_service.send_email("user@test.local", "Subject", "Body")  # must not raise
 
     assert "Failed to send email" in caplog.text
+
+
+def test_logs_never_contain_full_recipient_address(monkeypatch, caplog):
+    """AW-1 / M-2: recipient addresses are PII; logs carry a masked form only."""
+    monkeypatch.setattr(settings, "smtp_enabled", False)
+    with caplog.at_level(logging.INFO, logger="email_service"):
+        email_service.send_email("someone@example.com", "s", "b")
+    assert "someone@example.com" not in caplog.text
+    assert "so***@example.com" in caplog.text
+
+
+def test_mask_email_shapes():
+    assert email_service.mask_email("someone@example.com") == "so***@example.com"
+    assert email_service.mask_email("a@example.com") == "a***@example.com"
+    assert email_service.mask_email("not-an-email") == "***"

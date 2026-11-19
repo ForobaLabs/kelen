@@ -20,6 +20,15 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def mask_email(address: str) -> str:
+    """Log-safe form of a recipient address: first two local characters + domain."""
+    local, sep, domain = address.partition("@")
+    if not sep or not local or not domain:
+        return "***"
+    return f"{local[:2]}***@{domain}"
+
+
 # ---------------------------------------------------------------------------
 # i18n strings — EN / FR / IT
 # ---------------------------------------------------------------------------
@@ -74,8 +83,7 @@ _I18N: dict[str, dict[str, str]] = {
             " et en saisissant le code ci-dessous."
         ),
         "no_action": (
-            "Si vous n'êtes pas à l'origine de cette demande,"
-            " ignorez simplement cet e-mail."
+            "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail."
         ),
         "footer": "Ce message a été envoyé par Kelen. Ne répondez pas à cet e-mail.",
     },
@@ -87,8 +95,7 @@ _I18N: dict[str, dict[str, str]] = {
         "verify_subject": "Verifica il tuo indirizzo email Kelen",
         "verify_heading": "Conferma la tua email",
         "verify_body": (
-            "Benvenuto su Kelen! Usa il codice qui sotto"
-            " per verificare il tuo indirizzo email."
+            "Benvenuto su Kelen! Usa il codice qui sotto per verificare il tuo indirizzo email."
         ),
         "email_change_subject": "Conferma il tuo nuovo indirizzo email Kelen",
         "email_change_heading": "Conferma cambio email",
@@ -106,7 +113,10 @@ _I18N: dict[str, dict[str, str]] = {
 }
 
 _COUNTRY_TO_LANG: dict[str, str] = {
-    "FR": "fr", "BE": "fr", "LU": "fr", "CH": "fr",
+    "FR": "fr",
+    "BE": "fr",
+    "LU": "fr",
+    "CH": "fr",
     "IT": "it",
 }
 
@@ -203,7 +213,7 @@ def _render_html(
 def _smtp_send(to: str, subject: str, html: str, plain: str) -> None:
     """Low-level SMTP dispatch. Logs but never raises."""
     if not settings.smtp_enabled:
-        logger.info("SMTP disabled — would send to %s: %s", to, subject)
+        logger.info("SMTP disabled — would send to %s: %s", mask_email(to), subject)
         return
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -218,13 +228,13 @@ def _smtp_send(to: str, subject: str, html: str, plain: str) -> None:
                 smtp.login(settings.smtp_user, settings.smtp_password)
             smtp.sendmail(settings.smtp_from, [to], msg.as_string())
     except (smtplib.SMTPException, OSError):
-        logger.exception("Failed to send email to %s", to)
+        logger.exception("Failed to send email to %s", mask_email(to))
 
 
 def send_email(to: str, subject: str, body: str) -> None:
     """Send a plain-text email. Kept for backward-compat (monthly reports)."""
     if not settings.smtp_enabled:
-        logger.info("SMTP disabled — would send email to %s: %s", to, subject)
+        logger.info("SMTP disabled — would send email to %s: %s", mask_email(to), subject)
         return
     message = MIMEText(body)
     message["Subject"] = subject
@@ -237,7 +247,7 @@ def send_email(to: str, subject: str, body: str) -> None:
                 smtp.login(settings.smtp_user, settings.smtp_password)
             smtp.sendmail(settings.smtp_from, [to], message.as_string())
     except (smtplib.SMTPException, OSError):
-        logger.exception("Failed to send email to %s", to)
+        logger.exception("Failed to send email to %s", mask_email(to))
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +270,7 @@ def send_otp_email(
         body=_t(lg, "otp_body"),
         code=code,
         extra=f'<p style="color:#64748B;font-size:13px;margin:0 0 16px;">'
-              f'{_t(lg, "otp_expiry", minutes=str(ttl_minutes))}</p>',
+        f"{_t(lg, 'otp_expiry', minutes=str(ttl_minutes))}</p>",
     )
     _smtp_send(to, subject, html, plain)
 
@@ -278,7 +288,7 @@ def send_signup_verify_email(
         body=_t(lg, "verify_body"),
         code=code,
         extra=f'<p style="color:#64748B;font-size:13px;margin:0 0 16px;">'
-              f'{_t(lg, "otp_expiry", minutes=str(ttl_minutes))}</p>',
+        f"{_t(lg, 'otp_expiry', minutes=str(ttl_minutes))}</p>",
     )
     _smtp_send(to, subject, html, plain)
 
@@ -296,7 +306,7 @@ def send_email_change_email(
         body=_t(lg, "email_change_body"),
         code=code,
         extra=f'<p style="color:#64748B;font-size:13px;margin:0 0 16px;">'
-              f'{_t(lg, "otp_expiry", minutes=str(ttl_minutes))}</p>',
+        f"{_t(lg, 'otp_expiry', minutes=str(ttl_minutes))}</p>",
     )
     _smtp_send(to, subject, html, plain)
 
@@ -318,6 +328,6 @@ def send_household_invite_email(
         body=_t(lg, "invite_body", inviter=inviter_name),
         code=token,
         extra=f'<p style="color:#94A3B8;font-size:14px;margin:0 0 16px;">'
-              f'{_t(lg, "invite_cta")}</p>',
+        f"{_t(lg, 'invite_cta')}</p>",
     )
     _smtp_send(to, subject, html, plain)

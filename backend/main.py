@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
@@ -54,7 +55,13 @@ from goals_router import router as goals_router
 from handoff_router import internal_router as handoff_internal_router
 from handoff_router import router as handoff_router
 from jeli_output_guard import sanitize_reply
-from jeli_service import JeliBusy, build_system_prompt, gather_context, stream_chat
+from jeli_service import (
+    JeliBusy,
+    build_system_prompt,
+    gather_context,
+    sanitize_display_name,
+    stream_chat,
+)
 from lab_router import router as lab_router
 from monthly_report_router import router as monthly_report_router
 from observability import init_error_tracking
@@ -75,7 +82,6 @@ from waitlist_router import router as waitlist_router
 from webhook_dispatch_job import start_webhook_dispatch_scheduler
 from whatif_router import router as whatif_router
 
-RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
 check_production_config(os.environ, cookie_secure=settings.cookie_secure)
 
 ALLOWED_ORIGINS = os.getenv(
@@ -113,6 +119,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
 
 _SIGN_IN_SUFFIXES = (
     "/auth/token",
@@ -210,7 +217,8 @@ class Personality(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
-    user_name: str = "User"
+    # Deprecated: ignored. The display name comes from the authenticated account.
+    user_name: str = Field(default="User", max_length=60)
     personality: Personality = Personality()
     lang: Literal["en", "it", "fr"] = "en"
 
@@ -230,6 +238,7 @@ async def _check_db() -> str:
 # Not rate-limited: a cheap SELECT 1, probed in parallel by Kelen's dashboard and the
 # uptime monitor from shared IPs (audit 2026-10-02 W1). /health/detailed stays bounded.
 @app.get("/health")
+@limiter.exempt
 async def health(request: Request) -> JSONResponse:
     db_status = await _check_db()
     ok = db_status == "ok"
@@ -300,7 +309,9 @@ async def markets_snapshot(
 
 
 @app.get("/markets/overview")
+@limiter.limit("30/minute")
 async def markets_overview(
+    request: Request,
     asset_class: str = Query("crypto"),
     suite_session: str | None = Cookie(default=None),
     stepup_tsumi: str | None = Cookie(default=None),
@@ -396,7 +407,7 @@ async def jeli_chat(
     system_prompt = build_system_prompt(
         pazuru_context=pazuru_ctx,
         tsumi_context=tsumi_ctx,
-        user_name=req.user_name,
+        user_name=sanitize_display_name(user.get("name")),
         tone=req.personality.tone,
         expertise=req.personality.expertise,
         lang=req.lang,

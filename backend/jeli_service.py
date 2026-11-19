@@ -111,6 +111,19 @@ async def gather_context(
 # ---------------------------------------------------------------------------
 
 
+MAX_DISPLAY_NAME = 60
+
+
+def sanitize_display_name(value: str | None) -> str:
+    """Make an account display name safe to embed in the system prompt: drop control
+    characters, turn line breaks into spaces, collapse whitespace, cap the length."""
+    cleaned = "".join(
+        " " if ch in "\r\n\t" else ch for ch in (value or "") if ch in "\r\n\t" or ch.isprintable()
+    )
+    cleaned = " ".join(cleaned.split())[:MAX_DISPLAY_NAME].strip()
+    return cleaned or "User"
+
+
 def build_system_prompt(
     pazuru_context: str,
     tsumi_context: str,
@@ -252,9 +265,12 @@ async def _ollama_narrative(system_prompt: str, message: str) -> str:
         "stream": False,
     }
     # Background reports queue behind interactive chat (long wait) rather than shedding.
-    async with _ollama_slot(wait=300.0), httpx.AsyncClient(
-        timeout=httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
-    ) as client:
+    async with (
+        _ollama_slot(wait=300.0),
+        httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
+        ) as client,
+    ):
         resp = await client.post(f"{settings.ollama_base_url}/api/chat", json=payload)
         resp.raise_for_status()
         data = resp.json()
