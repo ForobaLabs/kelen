@@ -544,7 +544,9 @@
     "saving": "Enregistrement…",
     "saveName": "Enregistrer le nom",
     "localNote": "Les préférences ci-dessous sont enregistrées uniquement sur cet appareil. Votre nom et votre photo ci-dessus sont partagés dans toute la suite.",
-    "avatarAlt": "Photo de profil"
+    "avatarAlt": "Photo de profil",
+    "avatarTooLarge": "La photo est trop volumineuse (max 2 Mo).",
+    "avatarFailed": "Impossible d'envoyer la photo. Réessayez."
   },
   "billing": {
     "title": "Abonnement",

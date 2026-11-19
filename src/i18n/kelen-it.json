@@ -544,7 +544,9 @@
     "saving": "Salvataggio…",
     "saveName": "Salva nome",
     "localNote": "Le preferenze qui sotto sono salvate solo su questo dispositivo. Nome e foto sopra sono condivisi in tutta la suite.",
-    "avatarAlt": "Foto del profilo"
+    "avatarAlt": "Foto del profilo",
+    "avatarTooLarge": "La foto è troppo grande (max 2 MB).",
+    "avatarFailed": "Impossibile caricare la foto. Riprova."
   },
   "billing": {
     "title": "Abbonamento",
