@@ -55,7 +55,13 @@ from goals_router import router as goals_router
 from handoff_router import internal_router as handoff_internal_router
 from handoff_router import router as handoff_router
 from jeli_output_guard import sanitize_reply
-from jeli_service import JeliBusy, build_system_prompt, gather_context, stream_chat
+from jeli_service import (
+    JeliBusy,
+    build_system_prompt,
+    gather_context,
+    sanitize_display_name,
+    stream_chat,
+)
 from lab_router import router as lab_router
 from monthly_report_router import router as monthly_report_router
 from observability import init_error_tracking
@@ -211,7 +217,8 @@ class Personality(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
-    user_name: str = "User"
+    # Deprecated: ignored. The display name comes from the authenticated account.
+    user_name: str = Field(default="User", max_length=60)
     personality: Personality = Personality()
     lang: Literal["en", "it", "fr"] = "en"
 
@@ -400,7 +407,7 @@ async def jeli_chat(
     system_prompt = build_system_prompt(
         pazuru_context=pazuru_ctx,
         tsumi_context=tsumi_ctx,
-        user_name=req.user_name,
+        user_name=sanitize_display_name(user.get("name")),
         tone=req.personality.tone,
         expertise=req.personality.expertise,
         lang=req.lang,
