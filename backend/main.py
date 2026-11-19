@@ -82,13 +82,13 @@ from waitlist_router import router as waitlist_router
 from webhook_dispatch_job import start_webhook_dispatch_scheduler
 from whatif_router import router as whatif_router
 
-check_production_config(os.environ, cookie_secure=settings.cookie_secure)
+check_production_config(os.environ, cookie_secure=settings.cookie_secure, app="foroba")
 
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:5175,http://localhost:5173,http://localhost:5174,http://localhost:5178",
 ).split(",")
-ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "true").lower() == "true"
+ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "false").lower() == "true"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
