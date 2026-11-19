@@ -81,3 +81,9 @@ def test_client_key_shapes(token_for):
     assert rate_limit.client_key(req(cookies={"suite_session": token_for(8)})) == "u:8"
     assert rate_limit.client_key(req(cookies={"suite_session": "junk"})) == "ip:203.0.113.9"
     assert rate_limit.client_key(req()) == "ip:203.0.113.9"
+
+
+def test_health_is_exempt_from_the_default_limit():
+    import main  # noqa: F401  (registers the exemption)
+
+    assert "main.health" in rate_limit.limiter._exempt_routes
