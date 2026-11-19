@@ -302,7 +302,9 @@ async def markets_snapshot(
 
 
 @app.get("/markets/overview")
+@limiter.limit("30/minute")
 async def markets_overview(
+    request: Request,
     asset_class: str = Query("crypto"),
     suite_session: str | None = Cookie(default=None),
     stepup_tsumi: str | None = Cookie(default=None),

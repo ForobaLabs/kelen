@@ -7,13 +7,14 @@ import json
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import db
 import whatif_service
 from auth.conn import get_conn
 from auth.entitlements_router import require_feature
+from rate_limit import limiter
 from stepup import issue_stepup_cookies
 
 router = APIRouter(prefix="/whatif", tags=["whatif"])
@@ -44,7 +45,9 @@ class SimulateParams(BaseModel):
 
 
 @router.post("/simulate")
+@limiter.limit("30/minute")
 async def simulate(
+    request: Request,
     body: SimulateParams,
     user: dict = Depends(require_feature(FEATURE_KEY)),
     suite_session: str | None = Cookie(default=None),

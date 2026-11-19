@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ import monthly_report_service as mrs
 import pdf_service
 from auth.conn import get_conn
 from auth.entitlements_router import require_feature
+from rate_limit import limiter
 from stepup import issue_stepup_cookies
 
 router = APIRouter(prefix="/reports/monthly", tags=["monthly-reports"])
@@ -67,7 +68,9 @@ class GenerateIn(BaseModel):
 
 
 @router.post("/generate")
+@limiter.limit("6/hour")
 async def generate(
+    request: Request,
     body: GenerateIn,
     background_tasks: BackgroundTasks,
     user: dict = Depends(require_feature(FEATURE_KEY)),
@@ -108,7 +111,9 @@ def get_report(
 
 
 @router.post("/{report_id}/retry")
+@limiter.limit("6/hour")
 async def retry(
+    request: Request,
     report_id: int,
     background_tasks: BackgroundTasks,
     user: dict = Depends(require_feature(FEATURE_KEY)),

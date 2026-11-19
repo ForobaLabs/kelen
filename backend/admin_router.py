@@ -9,7 +9,17 @@ import logging
 import sqlite3
 
 import httpx
-from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ValidationError
 
 import backup_orchestrator
@@ -20,6 +30,7 @@ from auth.conn import get_conn
 from auth.dependencies import require_admin
 from auth.models import AdminKpis, InviteCode, InviteCodeCreateRequest, UserPublic
 from config import settings
+from rate_limit import limiter
 from settings_store import DEFAULT_SETTINGS, get_all, set_value
 
 router = APIRouter(tags=["admin"])
@@ -64,7 +75,9 @@ def admin_get_settings(
 
 
 @router.patch("/admin/settings/{key}")
+@limiter.limit("30/minute")
 def admin_patch_setting(
+    request: Request,
     key: str,
     body: SettingPatch,
     conn: sqlite3.Connection = Depends(get_conn),
@@ -102,7 +115,9 @@ class AccountDisabledPatch(BaseModel):
 
 
 @router.patch("/admin/users/{user_id}/disabled", response_model=UserPublic)
+@limiter.limit("30/minute")
 def admin_set_account_disabled(
+    request: Request,
     user_id: int,
     body: AccountDisabledPatch,
     conn: sqlite3.Connection = Depends(get_conn),
@@ -141,7 +156,9 @@ def admin_list_invite_codes(
 
 
 @router.post("/admin/invite-codes", response_model=InviteCode, status_code=201)
+@limiter.limit("30/minute")
 def admin_create_invite_code(
+    request: Request,
     body: InviteCodeCreateRequest,
     conn: sqlite3.Connection = Depends(get_conn),
     admin: dict = Depends(require_admin),
@@ -157,7 +174,9 @@ def admin_create_invite_code(
 
 
 @router.delete("/admin/invite-codes/{code_id}", status_code=204)
+@limiter.limit("30/minute")
 def admin_revoke_invite_code(
+    request: Request,
     code_id: int,
     conn: sqlite3.Connection = Depends(get_conn),
     _: dict = Depends(require_admin),
@@ -173,7 +192,10 @@ def admin_export_backup(_: dict = Depends(require_admin)) -> Response:
 
 
 @router.post("/admin/backup/import")
-async def admin_import_backup(file: UploadFile, _: dict = Depends(require_admin)) -> dict:
+@limiter.limit("30/minute")
+async def admin_import_backup(
+    request: Request, file: UploadFile, _: dict = Depends(require_admin)
+) -> dict:
     data = await file.read()
     try:
         return backup_service.import_archive(data)
@@ -182,7 +204,9 @@ async def admin_import_backup(file: UploadFile, _: dict = Depends(require_admin)
 
 
 @router.post("/admin/backup/export-suite")
+@limiter.limit("30/minute")
 async def admin_export_suite(
+    request: Request,
     body: BackupExportRequest,
     _: dict = Depends(require_admin),
     suite_session: str | None = Cookie(default=None),
@@ -197,7 +221,9 @@ async def admin_export_suite(
 
 
 @router.post("/admin/backup/import-suite")
+@limiter.limit("30/minute")
 async def admin_import_suite(
+    request: Request,
     file: UploadFile,
     passphrase: str = Form(...),
     _: dict = Depends(require_admin),

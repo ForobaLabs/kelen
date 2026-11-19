@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from ai_gateway_client import GatewayRejected, GatewayUnavailable, get_client
 from auth.dependencies import _token_from_header, get_current_user, require_admin
+from rate_limit import limiter
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -155,6 +156,7 @@ async def delete_byok(
 
 
 @router.post("/byok/{provider}/test")
+@limiter.limit("10/hour")
 async def test_byok(
     provider: str,
     request: Request,

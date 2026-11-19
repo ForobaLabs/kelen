@@ -15,6 +15,7 @@ from billing.paddle_signature import SignatureError, verify_signature
 from billing.provider import BillingProviderError, Plan, get_provider
 from billing.service import apply_event
 from config import settings
+from rate_limit import limiter
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -78,7 +79,10 @@ def status(user: dict = Depends(get_current_user), conn: sqlite3.Connection = De
 
 
 @router.post("/checkout-session")
-def checkout_session(body: CheckoutRequest, user: dict = Depends(get_current_user)):
+@limiter.limit("10/hour")
+def checkout_session(
+    request: Request, body: CheckoutRequest, user: dict = Depends(get_current_user)
+):
     _require_enabled()
     try:
         url = get_provider(settings.billing_provider).create_checkout(

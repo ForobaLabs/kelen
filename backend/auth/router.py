@@ -253,7 +253,9 @@ _EXPORT_SECRET_FIELDS = frozenset(
 
 
 @router.get("/account/export")
+@limiter.limit("3/hour")
 async def export_account(
+    request: Request,
     user: dict = Depends(get_current_user),
     conn: sqlite3.Connection = Depends(get_conn),
     suite_session: str | None = Cookie(default=None),
@@ -321,8 +323,9 @@ def login(
             repo.register_failed_login(conn, user["id"])
         _ip = request.client.host if request.client else None
         _uid = user["id"] if user is not None else None
-        security_log.log_event(conn, user_id=_uid, event="login_failed",
-                               detail="invalid credentials", ip=_ip)
+        security_log.log_event(
+            conn, user_id=_uid, event="login_failed", detail="invalid credentials", ip=_ip
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if needs_rehash(user["password_hash"]):
         new_hash = hash_password(req.password)
@@ -338,8 +341,13 @@ def login(
             "mfa_ticket": ticket,
         }
     repo.reset_failed_login(conn, user["id"])
-    security_log.log_event(conn, user_id=user["id"], event="login_success",
-                           detail=None, ip=request.client.host if request.client else None)
+    security_log.log_event(
+        conn,
+        user_id=user["id"],
+        event="login_success",
+        detail=None,
+        ip=request.client.host if request.client else None,
+    )
     _set_session_cookie(response, user, request.url.hostname)
     return UserPublic(**user).model_dump()
 
@@ -628,6 +636,7 @@ def me(
 
 # ── A2: Email verification (foroba#178) ──────────────────────────────────────
 
+
 @router.post("/verify-email", status_code=204)
 @limiter.limit("10/minute")
 def verify_email(
@@ -666,6 +675,7 @@ def resend_verification(
 
 
 # ── A6: Email change flow (foroba#182) ───────────────────────────────────────
+
 
 @router.post("/me/email/change-request", status_code=204)
 @limiter.limit("5/minute")
@@ -879,13 +889,20 @@ def update_name(
     repo.set_name(conn, user["id"], req.first_name, req.last_name)
 
 
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
+
+
 @router.post("/me/avatar")
+@limiter.limit("10/hour")
 async def upload_avatar(
+    request: Request,
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> dict:
-    content = await file.read()
+    content = await file.read(MAX_AVATAR_BYTES + 1)
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Avatar too large")
     avatar_url = save_avatar(user["id"], file, content)
     repo.set_avatar_url(conn, user["id"], avatar_url)
     return {"avatar_url": avatar_url}
@@ -913,9 +930,7 @@ def change_password(
     conn.commit()
     _revoke_every_session(conn, user["id"])
     if request.cookies.get("suite_session"):
-        _set_session_cookie(
-            response, repo.get_user_by_id(conn, user["id"]), request.url.hostname
-        )
+        _set_session_cookie(response, repo.get_user_by_id(conn, user["id"]), request.url.hostname)
 
 
 def _revoke_every_session(conn: sqlite3.Connection, user_id: int) -> None:
@@ -972,6 +987,7 @@ def visible_owners(
 
 
 # ── Push notification device-token registration (#37 — IOS-4.4) ──────────────
+
 
 class DevicePushTokenRequest(BaseModel):
     token: str

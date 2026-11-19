@@ -61,4 +61,4 @@ def test_upload_rejects_file_over_2mb(client):
         "/auth/me/avatar",
         files={"file": ("big.png", io.BytesIO(oversized), "image/png")},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 413
