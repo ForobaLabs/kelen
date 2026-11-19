@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 import security_log
 from ai_gateway_client import get_client, record_pending_delete
-from auth import keys, mfa_ticket, refresh_tokens
+from auth import breached_passwords, keys, mfa_ticket, refresh_tokens
 from auth import repository as repo
 from auth.avatar_storage import save_avatar
 from auth.conn import get_conn  # re-exported for tests that import it from here
@@ -112,6 +112,13 @@ def _set_session_cookie(response: Response, user: dict, host: str | None = None)
     )
 
 
+def _reject_breached(password: str) -> None:
+    if breached_passwords.is_breached(password):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, breached_passwords.BREACHED_MESSAGE
+        )
+
+
 @router.post("/register", response_model=UserPublic, status_code=201)
 @limiter.limit("5/minute")
 def register(
@@ -122,6 +129,7 @@ def register(
 ) -> dict:
     if repo.get_user_by_email(conn, req.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+    _reject_breached(req.password)
     # GL-10.1 (foroba#185): invite-only gating is opt-in via the require_invite_code
     # runtime setting, off by default — self-host deployments keep open registration.
     if get_settings(conn).get("require_invite_code") == "true":
@@ -923,6 +931,7 @@ def change_password(
     device that changed the password stays signed in."""
     if not verify_password(req.current_password, user["password_hash"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Current password is incorrect")
+    _reject_breached(req.new_password)
     conn.execute(
         "UPDATE users SET password_hash = ? WHERE id = ?",
         (hash_password(req.new_password), user["id"]),
@@ -966,6 +975,7 @@ def password_reset_confirm(
 ) -> None:
     """Complete a password reset: verify the OTP, update the hash, revoke every
     session. Returns 400 on invalid / expired code."""
+    _reject_breached(req.new_password)  # before the OTP is consumed
     user = repo.get_user_by_email(conn, req.email)
     if user is None or not verify_email_otp(conn, user["id"], req.code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired code")

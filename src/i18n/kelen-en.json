@@ -427,6 +427,7 @@
     "errSendCode": "Failed to send code.",
     "errReset": "Failed to send reset email.",
     "errResetConfirm": "Invalid or expired code.",
+    "errPasswordBreached": "This password appears in known data breaches. Choose a different one.",
     "verifyTitle": "Verify it's you",
     "signedInAs": "Signed in as {{email}}",
     "method": "Verification method",

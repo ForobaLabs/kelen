@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     # refresh / step-up endpoint. Set MAINTENANCE_MODE=true and restart the container.
     maintenance_mode: bool = False
     deployment_mode: str = "selfhost"
+    # AW-6: HIBP k-anonymity breached-password check. None = on when hosted, off when selfhost.
+    hibp_check_enabled: bool | None = None
 
     # --- Jeli Lab hosted re-enablement (foroba#189) ---
     # Even in "hosted" mode, Jeli Lab stays hard-disabled unless this is explicitly set

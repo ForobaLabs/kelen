@@ -1,3 +1,4 @@
+import i18n from "../i18n";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -55,8 +56,17 @@ export interface RegisterInput {
 }
 
 /** Backend validation text (pydantic) is not user copy; map the known cases to plain advice. */
+/** Backend breach rejection (HIBP) shown in the active UI language; other details pass through. */
+export function passwordErrorMessage(detail: unknown, fallback: string): string {
+  if (typeof detail === "string" && /known data breaches/i.test(detail)) {
+    return i18n.t("login.errPasswordBreached");
+  }
+  return typeof detail === "string" && detail ? detail : fallback;
+}
+
 export function friendlyRegisterError(detail: unknown): string {
   const text = typeof detail === "string" ? detail : "";
+  if (/known data breaches/i.test(text)) return i18n.t("login.errPasswordBreached");
   if (/email address/i.test(text)) {
     return "That email address can't be used. Check it for typos, or try another one.";
   }
@@ -421,7 +431,7 @@ export async function changePassword(
   });
   if (!r.ok) {
     const body = await r.json().catch(() => null);
-    throw new Error(body?.detail ?? "Failed to change password.");
+    throw new Error(passwordErrorMessage(body?.detail, "Failed to change password."));
   }
 }
 
@@ -457,7 +467,7 @@ export async function confirmPasswordReset(
   });
   if (!r.ok) {
     const body = await r.json().catch(() => null);
-    throw new Error(body?.detail ?? "Invalid or expired code.");
+    throw new Error(passwordErrorMessage(body?.detail, "Invalid or expired code."));
   }
 }
 

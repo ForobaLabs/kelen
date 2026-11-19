@@ -427,6 +427,7 @@
     "errSendCode": "Invio del codice non riuscito.",
     "errReset": "Invio dell'email di reimpostazione non riuscito.",
     "errResetConfirm": "Codice non valido o scaduto.",
+    "errPasswordBreached": "Questa password compare in violazioni di dati note. Scegline un'altra.",
     "verifyTitle": "Verifica la tua identità",
     "signedInAs": "Accesso come {{email}}",
     "method": "Metodo di verifica",

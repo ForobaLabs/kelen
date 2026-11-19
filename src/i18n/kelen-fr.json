@@ -427,6 +427,7 @@
     "errSendCode": "Échec de l'envoi du code.",
     "errReset": "Échec de l'envoi de l'e-mail de réinitialisation.",
     "errResetConfirm": "Code invalide ou expiré.",
+    "errPasswordBreached": "Ce mot de passe figure dans des fuites de données connues. Choisissez-en un autre.",
     "verifyTitle": "Confirmez votre identité",
     "signedInAs": "Connecté en tant que {{email}}",
     "method": "Méthode de vérification",
