@@ -20,8 +20,9 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
+import admin_audit
 import backup_orchestrator
 import backup_service
 import invite_codes as invite_codes_gen
@@ -29,6 +30,7 @@ from auth import repository as repo
 from auth.conn import get_conn
 from auth.dependencies import require_admin
 from auth.models import AdminKpis, InviteCode, InviteCodeCreateRequest, UserPublic
+from auth.reauth import ReauthBody, verify_reauth
 from config import settings
 from rate_limit import limiter
 from settings_store import DEFAULT_SETTINGS, get_all, set_value
@@ -62,8 +64,27 @@ class SettingPatch(BaseModel):
     value: str
 
 
-class BackupExportRequest(BaseModel):
-    passphrase: str
+class BackupExportRequest(ReauthBody):
+    passphrase: str = Field(min_length=12)
+
+
+class BackupFileExportRequest(BackupExportRequest):
+    include_keys: bool = False
+
+
+def _client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
+def _reauth_or_audit(
+    conn: sqlite3.Connection, request: Request, admin: dict, body: ReauthBody, action: str
+) -> None:
+    """Re-authenticate the admin; a failed attempt is audited as `<action>.denied`."""
+    try:
+        verify_reauth(admin, body)
+    except HTTPException:
+        admin_audit.record(conn, admin["id"], f"{action}.denied", ip=_client_ip(request))
+        raise
 
 
 @router.get("/admin/settings")
@@ -81,13 +102,16 @@ def admin_patch_setting(
     key: str,
     body: SettingPatch,
     conn: sqlite3.Connection = Depends(get_conn),
-    _: dict = Depends(require_admin),
+    admin: dict = Depends(require_admin),
 ) -> dict[str, str]:
     if key not in DEFAULT_SETTINGS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown key: {key!r}")
     if body.value not in ("true", "false"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "value must be 'true' or 'false'")
     set_value(conn, key, body.value)
+    admin_audit.record(
+        conn, admin["id"], "settings.update", target=key, detail=body.value, ip=_client_ip(request)
+    )
     _invalidate_downstream_settings_caches()
     return get_all(conn)
 
@@ -129,6 +153,13 @@ def admin_set_account_disabled(
     if target is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     repo.set_account_disabled(conn, user_id, body.disabled)
+    admin_audit.record(
+        conn,
+        admin["id"],
+        "user.disable" if body.disabled else "user.enable",
+        target=str(user_id),
+        ip=_client_ip(request),
+    )
     return repo.get_user_by_id(conn, user_id)
 
 
@@ -163,7 +194,7 @@ def admin_create_invite_code(
     conn: sqlite3.Connection = Depends(get_conn),
     admin: dict = Depends(require_admin),
 ) -> dict:
-    return repo.create_invite_code(
+    created = repo.create_invite_code(
         conn,
         code=invite_codes_gen.generate_code(),
         note=body.note,
@@ -171,6 +202,10 @@ def admin_create_invite_code(
         expires_at=body.expires_at,
         created_by_user_id=admin["id"],
     )
+    admin_audit.record(
+        conn, admin["id"], "invite.create", target=str(created["id"]), ip=_client_ip(request)
+    )
+    return created
 
 
 @router.delete("/admin/invite-codes/{code_id}", status_code=204)
@@ -179,63 +214,129 @@ def admin_revoke_invite_code(
     request: Request,
     code_id: int,
     conn: sqlite3.Connection = Depends(get_conn),
-    _: dict = Depends(require_admin),
+    admin: dict = Depends(require_admin),
 ) -> None:
     if not repo.revoke_invite_code(conn, code_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite code not found or already revoked")
+    admin_audit.record(
+        conn, admin["id"], "invite.revoke", target=str(code_id), ip=_client_ip(request)
+    )
 
 
-@router.get("/admin/backup/export")
-def admin_export_backup(_: dict = Depends(require_admin)) -> Response:
-    data = backup_service.export_archive()
-    return Response(content=data, media_type="application/gzip")
-
-
-@router.post("/admin/backup/import")
-@limiter.limit("30/minute")
-async def admin_import_backup(
-    request: Request, file: UploadFile, _: dict = Depends(require_admin)
-) -> dict:
-    data = await file.read()
-    try:
-        return backup_service.import_archive(data)
-    except (ValueError, OSError) as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-
-
-@router.post("/admin/backup/export-suite")
-@limiter.limit("30/minute")
-async def admin_export_suite(
+@router.post("/admin/backup/export")
+@limiter.limit("3/hour")
+def admin_export_backup(
     request: Request,
-    body: BackupExportRequest,
-    _: dict = Depends(require_admin),
-    suite_session: str | None = Cookie(default=None),
-    stepup_pazuru: str | None = Cookie(default=None),
-    stepup_tsumi: str | None = Cookie(default=None),
+    body: BackupFileExportRequest,
+    conn: sqlite3.Connection = Depends(get_conn),
+    admin: dict = Depends(require_admin),
 ) -> Response:
-    stepup = {k: v for k, v in (("pazuru", stepup_pazuru), ("tsumi", stepup_tsumi)) if v}
-    data = await backup_orchestrator.export_suite(
-        body.passphrase, cookie=suite_session, stepup=stepup
+    _reauth_or_audit(conn, request, admin, body, "backup.export")
+    data = backup_orchestrator.encrypt_archive(
+        backup_service.export_archive(include_keys=body.include_keys), body.passphrase
+    )
+    admin_audit.record(
+        conn,
+        admin["id"],
+        "backup.export",
+        detail="include_keys" if body.include_keys else None,
+        ip=_client_ip(request),
     )
     return Response(content=data, media_type="application/octet-stream")
 
 
+@router.post("/admin/backup/import")
+@limiter.limit("3/hour")
+async def admin_import_backup(
+    request: Request,
+    file: UploadFile,
+    password: str = Form(...),
+    totp_code: str = Form(...),
+    passphrase: str = Form(...),
+    conn: sqlite3.Connection = Depends(get_conn),
+    admin: dict = Depends(require_admin),
+) -> dict:
+    _reauth_or_audit(
+        conn, request, admin, ReauthBody(password=password, totp_code=totp_code), "backup.import"
+    )
+    data = await file.read(backup_service.MAX_ARCHIVE_BYTES + 1)
+    if len(data) > backup_service.MAX_ARCHIVE_BYTES:
+        raise HTTPException(413, "Archive too large")
+    try:
+        plain = backup_orchestrator.decrypt_archive(data, passphrase)
+        result = backup_service.import_archive(plain)
+    except (backup_orchestrator.InvalidPassphrase, ValueError, OSError) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    admin_audit.record(conn, admin["id"], "backup.import", ip=_client_ip(request))
+    return result
+
+
+@router.post("/admin/backup/export-suite")
+@limiter.limit("3/hour")
+async def admin_export_suite(
+    request: Request,
+    body: BackupExportRequest,
+    conn: sqlite3.Connection = Depends(get_conn),
+    admin: dict = Depends(require_admin),
+    suite_session: str | None = Cookie(default=None),
+    stepup_pazuru: str | None = Cookie(default=None),
+    stepup_tsumi: str | None = Cookie(default=None),
+) -> Response:
+    _reauth_or_audit(conn, request, admin, body, "backup.export_suite")
+    stepup = {k: v for k, v in (("pazuru", stepup_pazuru), ("tsumi", stepup_tsumi)) if v}
+    try:
+        data = await backup_orchestrator.export_suite(
+            body.passphrase, cookie=suite_session, stepup=stepup
+        )
+    except backup_orchestrator.StepUpRequired as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    admin_audit.record(conn, admin["id"], "backup.export_suite", ip=_client_ip(request))
+    return Response(content=data, media_type="application/octet-stream")
+
+
 @router.post("/admin/backup/import-suite")
-@limiter.limit("30/minute")
+@limiter.limit("3/hour")
 async def admin_import_suite(
     request: Request,
     file: UploadFile,
+    password: str = Form(...),
+    totp_code: str = Form(...),
     passphrase: str = Form(...),
-    _: dict = Depends(require_admin),
+    conn: sqlite3.Connection = Depends(get_conn),
+    admin: dict = Depends(require_admin),
     suite_session: str | None = Cookie(default=None),
     stepup_pazuru: str | None = Cookie(default=None),
     stepup_tsumi: str | None = Cookie(default=None),
 ) -> dict:
-    data = await file.read()
+    _reauth_or_audit(
+        conn,
+        request,
+        admin,
+        ReauthBody(password=password, totp_code=totp_code),
+        "backup.import_suite",
+    )
+    data = await file.read(backup_service.MAX_ARCHIVE_BYTES + 1)
+    if len(data) > backup_service.MAX_ARCHIVE_BYTES:
+        raise HTTPException(413, "Archive too large")
     stepup = {k: v for k, v in (("pazuru", stepup_pazuru), ("tsumi", stepup_tsumi)) if v}
     try:
-        return await backup_orchestrator.import_suite(
+        result = await backup_orchestrator.import_suite(
             data, passphrase, cookie=suite_session, stepup=stepup
         )
+    except backup_orchestrator.StepUpRequired as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except (backup_orchestrator.InvalidPassphrase, ValueError) as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    admin_audit.record(conn, admin["id"], "backup.import_suite", ip=_client_ip(request))
+    return result
+
+
+@router.get("/admin/audit-log")
+@limiter.limit("30/minute")
+def admin_audit_log(
+    request: Request,
+    limit: int = 100,
+    conn: sqlite3.Connection = Depends(get_conn),
+    _: dict = Depends(require_admin),
+) -> list[dict]:
+    return admin_audit.list_recent(conn, limit)

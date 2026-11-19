@@ -218,6 +218,17 @@ CREATE TABLE IF NOT EXISTS email_otp_codes (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_user_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target TEXT,
+    detail TEXT,
+    ip TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log (created_at);
+
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),

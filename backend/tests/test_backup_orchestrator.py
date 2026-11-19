@@ -12,6 +12,8 @@ import pytest
 
 import backup_orchestrator as orch
 
+STEPUP = {"pazuru": "sp", "tsumi": "st"}
+
 
 def _mini_tar(name: str, content: bytes) -> bytes:
     buf = io.BytesIO()
@@ -66,7 +68,7 @@ def test_export_suite_bundles_and_encrypts(monkeypatch):
     monkeypatch.setattr(orch.settings, "pazuru_api_url", "http://pazuru-host")
     monkeypatch.setattr(orch.settings, "tsumi_api_url", "http://tsumi-host")
     monkeypatch.setattr(
-        orch, "export_archive", lambda: _mini_tar("foroba_identity.db", b"foroba-data")
+        orch, "export_archive", lambda **kw: _mini_tar("foroba_identity.db", b"foroba-data")
     )
     pazuru_blob = _mini_tar("pazuru.db", b"pazuru-data")
     tsumi_blob = _mini_tar("tsumi.duckdb", b"tsumi-data")
@@ -76,7 +78,9 @@ def test_export_suite_bundles_and_encrypts(monkeypatch):
         lambda *a, **kw: _FakeClient({"pazuru": pazuru_blob, "tsumi": tsumi_blob}),
     )
 
-    encrypted = asyncio.run(orch.export_suite("correct-horse-battery-staple", cookie="fake-cookie"))
+    encrypted = asyncio.run(
+        orch.export_suite("correct-horse-battery-staple", cookie="fake-cookie", stepup=STEPUP)
+    )
     assert isinstance(encrypted, bytes) and len(encrypted) > 16  # salt prefix + ciphertext
 
     decrypted = orch.decrypt_archive(encrypted, "correct-horse-battery-staple")
@@ -89,7 +93,7 @@ def test_decrypt_archive_wrong_passphrase_raises(monkeypatch):
     monkeypatch.setattr(orch.settings, "pazuru_api_url", "http://pazuru-host")
     monkeypatch.setattr(orch.settings, "tsumi_api_url", "http://tsumi-host")
     monkeypatch.setattr(
-        orch, "export_archive", lambda: _mini_tar("foroba_identity.db", b"foroba-data")
+        orch, "export_archive", lambda **kw: _mini_tar("foroba_identity.db", b"foroba-data")
     )
     monkeypatch.setattr(
         orch.httpx,
@@ -101,7 +105,9 @@ def test_decrypt_archive_wrong_passphrase_raises(monkeypatch):
             }
         ),
     )
-    encrypted = asyncio.run(orch.export_suite("right-passphrase", cookie="fake-cookie"))
+    encrypted = asyncio.run(
+        orch.export_suite("right-passphrase", cookie="fake-cookie", stepup=STEPUP)
+    )
 
     with pytest.raises(orch.InvalidPassphrase):
         orch.decrypt_archive(encrypted, "wrong-passphrase")
@@ -111,7 +117,7 @@ def test_import_suite_forwards_to_pazuru_and_tsumi(monkeypatch):
     monkeypatch.setattr(orch.settings, "pazuru_api_url", "http://pazuru-host")
     monkeypatch.setattr(orch.settings, "tsumi_api_url", "http://tsumi-host")
     monkeypatch.setattr(
-        orch, "export_archive", lambda: _mini_tar("foroba_identity.db", b"foroba-data")
+        orch, "export_archive", lambda **kw: _mini_tar("foroba_identity.db", b"foroba-data")
     )
     pazuru_blob = _mini_tar("pazuru.db", b"pazuru-data")
     tsumi_blob = _mini_tar("tsumi.duckdb", b"tsumi-data")
@@ -126,7 +132,7 @@ def test_import_suite_forwards_to_pazuru_and_tsumi(monkeypatch):
             },
         ),
     )
-    encrypted = asyncio.run(orch.export_suite("pw", cookie="fake-cookie"))
+    encrypted = asyncio.run(orch.export_suite("pw", cookie="fake-cookie", stepup=STEPUP))
 
     imported_local: list[bytes] = []
     monkeypatch.setattr(
@@ -138,7 +144,7 @@ def test_import_suite_forwards_to_pazuru_and_tsumi(monkeypatch):
         ),
     )
 
-    result = asyncio.run(orch.import_suite(encrypted, "pw", cookie="fake-cookie"))
+    result = asyncio.run(orch.import_suite(encrypted, "pw", cookie="fake-cookie", stepup=STEPUP))
 
     assert result["foroba"]["restored_files"] == ["foroba_identity.db"]
     assert result["pazuru"]["restored_files"] == ["pazuru.db"]
@@ -151,7 +157,7 @@ def test_export_suite_sends_per_app_stepup_tokens(monkeypatch):
     them; the nightly job and the admin route must send one per app."""
     monkeypatch.setattr(orch.settings, "pazuru_api_url", "http://pazuru-host")
     monkeypatch.setattr(orch.settings, "tsumi_api_url", "http://tsumi-host")
-    monkeypatch.setattr(orch, "export_archive", lambda: _mini_tar("f.db", b"f"))
+    monkeypatch.setattr(orch, "export_archive", lambda **kw: _mini_tar("f.db", b"f"))
     seen: dict[str, dict] = {}
 
     class _Capturing(_FakeClient):
@@ -178,7 +184,7 @@ def test_export_suite_sends_per_app_stepup_tokens(monkeypatch):
 def test_import_suite_sends_per_app_stepup_tokens(monkeypatch):
     monkeypatch.setattr(orch.settings, "pazuru_api_url", "http://pazuru-host")
     monkeypatch.setattr(orch.settings, "tsumi_api_url", "http://tsumi-host")
-    monkeypatch.setattr(orch, "export_archive", lambda: _mini_tar("f.db", b"f"))
+    monkeypatch.setattr(orch, "export_archive", lambda **kw: _mini_tar("f.db", b"f"))
     monkeypatch.setattr(orch, "import_archive", lambda data: {"restored_files": []})
     monkeypatch.setattr(
         orch.httpx,
@@ -187,7 +193,7 @@ def test_import_suite_sends_per_app_stepup_tokens(monkeypatch):
             {"pazuru": _mini_tar("p.db", b"p"), "tsumi": _mini_tar("t", b"t")}
         ),
     )
-    encrypted = asyncio.run(orch.export_suite("pw", cookie="c"))
+    encrypted = asyncio.run(orch.export_suite("pw", cookie="c", stepup=STEPUP))
     seen: dict[str, dict] = {}
 
     class _Capturing(_FakeClient):
@@ -203,3 +209,13 @@ def test_import_suite_sends_per_app_stepup_tokens(monkeypatch):
 
     assert seen["http://pazuru-host/admin/backup/import"]["X-Stepup-Token"] == "sp"
     assert seen["http://tsumi-host/admin/backup/import"]["X-Stepup-Token"] == "st"
+
+
+@pytest.mark.parametrize("stepup", [None, {}, {"pazuru": "sp"}, {"tsumi": "st"}])
+def test_export_suite_refuses_without_both_stepups(monkeypatch, stepup):
+    """AW-3: a missing step-up must fail before anything is exported (no partial archive)."""
+    called = []
+    monkeypatch.setattr(orch, "export_archive", lambda **kw: called.append(1) or b"x")
+    with pytest.raises(orch.StepUpRequired):
+        asyncio.run(orch.export_suite("pw", cookie="c", stepup=stepup))
+    assert called == []
