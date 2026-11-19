@@ -50,6 +50,28 @@ def client_key(request: Request) -> str:
 limiter = Limiter(key_func=client_key, default_limits=[DEFAULT_LIMIT])
 
 
+async def enforce_default_limit(request: Request) -> None:
+    """App-wide dependency enforcing rate limits on every matched route (AW-6).
+
+    slowapi's ``SlowAPIMiddleware`` looks the handler up in ``app.routes``; on current FastAPI
+    that list holds ``_IncludedRouter`` objects without ``.endpoint``, so every route mounted via
+    ``include_router`` silently skipped the default limit. A dependency runs after routing, where
+    ``request.scope["route"]`` is the real route, and before route-level auth dependencies, so
+    rejected (401/403) attempts count too. Routes with their own ``@limiter.limit`` are checked
+    here against that limit (the decorator then sees ``_rate_limiting_complete`` and skips its
+    own check: one hit per request); ``@limiter.exempt`` routes are skipped.
+    """
+    handler = getattr(request.scope.get("route"), "endpoint", None)
+    if handler is None:
+        return
+    name = f"{handler.__module__}.{handler.__name__}"
+    if name in limiter._exempt_routes:
+        return
+    own = name in limiter._route_limits or name in limiter._dynamic_route_limits
+    limiter._check_request_limit(request, handler, not own)
+    request.state._rate_limiting_complete = True
+
+
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """429 handler that also sends `Retry-After` (seconds until the window resets).
 

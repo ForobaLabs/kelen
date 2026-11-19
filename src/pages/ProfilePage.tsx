@@ -17,6 +17,7 @@ export function ProfilePage() {
   // cleared after a successful save so the next render reflects the fresh fetch.
   const [nameDraft, setNameDraft] = useState<{ firstName: string; lastName: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const firstName = nameDraft?.firstName ?? suiteProfile?.firstName ?? '';
   const lastName = nameDraft?.lastName ?? suiteProfile?.lastName ?? '';
 
@@ -45,7 +46,17 @@ export function ProfilePage() {
     if (!file) return;
     const form = new FormData();
     form.append('file', file);
-    await fetch('/jeli/auth/me/avatar', { method: 'POST', credentials: 'include', body: form });
+    setAvatarError(null);
+    try {
+      const res = await fetch('/jeli/auth/me/avatar', { method: 'POST', credentials: 'include', body: form });
+      if (!res.ok) {
+        setAvatarError(t(res.status === 413 ? 'profilePage.avatarTooLarge' : 'profilePage.avatarFailed'));
+        return;
+      }
+    } catch {
+      setAvatarError(t('profilePage.avatarFailed'));
+      return;
+    }
     await refetch();
   }
 
@@ -77,6 +88,11 @@ export function ProfilePage() {
               <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadAvatar} />
             </label>
           </div>
+          {avatarError && (
+            <p role="alert" className="mb-3 text-sm text-[var(--color-danger,#dc2626)]">
+              {avatarError}
+            </p>
+          )}
           <div className="flex gap-3">
             <input
               value={firstName}

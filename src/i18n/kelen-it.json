@@ -427,6 +427,7 @@
     "errSendCode": "Invio del codice non riuscito.",
     "errReset": "Invio dell'email di reimpostazione non riuscito.",
     "errResetConfirm": "Codice non valido o scaduto.",
+    "errPasswordBreached": "Questa password compare in violazioni di dati note. Scegline un'altra.",
     "verifyTitle": "Verifica la tua identità",
     "signedInAs": "Accesso come {{email}}",
     "method": "Metodo di verifica",
@@ -543,7 +544,9 @@
     "saving": "Salvataggio…",
     "saveName": "Salva nome",
     "localNote": "Le preferenze qui sotto sono salvate solo su questo dispositivo. Nome e foto sopra sono condivisi in tutta la suite.",
-    "avatarAlt": "Foto del profilo"
+    "avatarAlt": "Foto del profilo",
+    "avatarTooLarge": "La foto è troppo grande (max 2 MB).",
+    "avatarFailed": "Impossibile caricare la foto. Riprova."
   },
   "billing": {
     "title": "Abbonamento",

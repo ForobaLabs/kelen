@@ -19,7 +19,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
@@ -69,7 +68,12 @@ from onboarding.router import router as onboarding_router
 from passkeys.router import router as passkeys_router
 from prod_guard import check_production_config
 from public_api_router import router as public_api_router
-from rate_limit import limiter, rate_limit_exceeded_handler, session_rate_limit_key
+from rate_limit import (
+    enforce_default_limit,
+    limiter,
+    rate_limit_exceeded_handler,
+    session_rate_limit_key,
+)
 from report_scheduler import start_report_scheduler
 from retention_job import start_retention_scheduler
 from session_floors_router import router as session_floors_router
@@ -95,6 +99,7 @@ logger = logging.getLogger(__name__)
 init_error_tracking(settings.glitchtip_dsn)
 
 app = FastAPI(
+    dependencies=[Depends(enforce_default_limit)],
     title="Foroba Jeli API",
     description="Unified local LLM assistant — cross-domain financial advisor",
     version="0.1.0",
@@ -119,7 +124,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(SlowAPIMiddleware)
 
 _SIGN_IN_SUFFIXES = (
     "/auth/token",

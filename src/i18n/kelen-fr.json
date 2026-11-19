@@ -427,6 +427,7 @@
     "errSendCode": "Échec de l'envoi du code.",
     "errReset": "Échec de l'envoi de l'e-mail de réinitialisation.",
     "errResetConfirm": "Code invalide ou expiré.",
+    "errPasswordBreached": "Ce mot de passe figure dans des fuites de données connues. Choisissez-en un autre.",
     "verifyTitle": "Confirmez votre identité",
     "signedInAs": "Connecté en tant que {{email}}",
     "method": "Méthode de vérification",
@@ -543,7 +544,9 @@
     "saving": "Enregistrement…",
     "saveName": "Enregistrer le nom",
     "localNote": "Les préférences ci-dessous sont enregistrées uniquement sur cet appareil. Votre nom et votre photo ci-dessus sont partagés dans toute la suite.",
-    "avatarAlt": "Photo de profil"
+    "avatarAlt": "Photo de profil",
+    "avatarTooLarge": "La photo est trop volumineuse (max 2 Mo).",
+    "avatarFailed": "Impossible d'envoyer la photo. Réessayez."
   },
   "billing": {
     "title": "Abonnement",
