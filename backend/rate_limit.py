@@ -7,12 +7,47 @@ routers).
 
 from __future__ import annotations
 
+import os
+
+import jwt
 from fastapi import Request, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address)
+DEFAULT_LIMIT = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
+
+
+def client_key(request: Request) -> str:
+    """Rate-limit identity: ``u:<user id>`` when the session token verifies, else
+    ``ip:<remote address>`` (AW-1 / H-1).
+
+    The token is the ``suite_session`` cookie or a Bearer header. It is verified (RS256
+    signature + expiry) so a forged or expired cookie can never mint a fresh bucket: it
+    falls back to the caller's IP bucket. No DB access; the ``sub`` claim is enough.
+    """
+    token = None
+    authorization = request.headers.get("authorization", "")
+    scheme, _, credential = authorization.partition(" ")
+    if scheme.lower() == "bearer" and credential.strip():
+        token = credential.strip()
+    token = token or request.cookies.get("suite_session")
+    if token:
+        # Imported here: auth.* imports this module's limiter (circular otherwise).
+        from auth import keys
+        from auth.security import decode_token
+        from config import settings
+
+        try:
+            _, public_key, _ = keys.get_keypair(settings)
+            claims = decode_token(token, public_key)
+            return f"u:{int(claims['sub'])}"
+        except (jwt.PyJWTError, ValueError, KeyError):
+            pass
+    return f"ip:{get_remote_address(request)}"
+
+
+limiter = Limiter(key_func=client_key, default_limits=[DEFAULT_LIMIT])
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
@@ -26,11 +61,5 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Res
     return response
 
 
-def session_rate_limit_key(request: Request) -> str:
-    """slowapi key_func: rate-limit per authenticated session, not per IP (foroba#176,
-    A9) — so users sharing a NAT/office IP don't share a budget, and a single user can't
-    dodge the limit by switching networks. Uses the raw `suite_session` cookie value as
-    the key (unique per login session, no need to decode/verify it here); falls back to
-    per-IP for unauthenticated requests."""
-    token = request.cookies.get("suite_session")
-    return token if token else get_remote_address(request)
+# Kept as an alias: existing routes import this name (foroba#176, A9).
+session_rate_limit_key = client_key

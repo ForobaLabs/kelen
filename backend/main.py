@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
@@ -75,7 +76,6 @@ from waitlist_router import router as waitlist_router
 from webhook_dispatch_job import start_webhook_dispatch_scheduler
 from whatif_router import router as whatif_router
 
-RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
 check_production_config(os.environ, cookie_secure=settings.cookie_secure)
 
 ALLOWED_ORIGINS = os.getenv(
@@ -113,6 +113,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
 
 _SIGN_IN_SUFFIXES = (
     "/auth/token",
@@ -230,6 +231,7 @@ async def _check_db() -> str:
 # Not rate-limited: a cheap SELECT 1, probed in parallel by Kelen's dashboard and the
 # uptime monitor from shared IPs (audit 2026-10-02 W1). /health/detailed stays bounded.
 @app.get("/health")
+@limiter.exempt
 async def health(request: Request) -> JSONResponse:
     db_status = await _check_db()
     ok = db_status == "ok"
